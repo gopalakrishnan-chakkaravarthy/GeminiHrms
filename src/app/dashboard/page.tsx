@@ -1,0 +1,121 @@
+import { LeaveBalanceCards } from "@/components/app/leave-balance-cards";
+import { LeaveRequestsTable } from "@/components/app/leave-requests-table";
+import { RequestLeaveDialog } from "@/components/app/request-leave-dialog";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import {
+  getLeaveRequestsForCurrentUser,
+  getAppUser,
+  getDefaultScreenForUser,
+  getLeaveTypes,
+  getLeaveBalances,
+  getFallbackUserId,
+} from "@/lib/data";
+import { auth, currentUser as getClerkUser } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { runCarryForwardLogicForUser } from "./actions";
+
+export default async function DashboardPage() {
+  let userId: string | null = null;
+  let clerkUser: any = null;
+
+  try {
+    const authObj = auth();
+    userId = authObj?.userId || null;
+    if (userId) {
+      clerkUser = await getClerkUser();
+    }
+  } catch {
+    // ignore Clerk error
+  }
+
+  if (!userId) {
+    userId = await getFallbackUserId();
+  }
+
+  const defaultScreen = await getDefaultScreenForUser(userId);
+  if (defaultScreen && defaultScreen !== "/dashboard") {
+    redirect(defaultScreen);
+  }
+
+  const appUser = await getAppUser(userId);
+
+  if (!appUser) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-center p-4">
+        <Card className="max-w-md w-full">
+          <CardHeader>
+            <CardTitle>Welcome to AbsenceAce!</CardTitle>
+            <CardDescription>Your account is almost ready.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground">
+              It looks like your employee profile hasn't been set up in our
+              system yet. Please contact your administrator to get access to
+              your leave management dashboard.
+            </p>
+            <Button asChild>
+              <Link href="/">Back to Homepage</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  } else {
+    // Run carry-forward logic if needed
+    await runCarryForwardLogicForUser(userId);
+  }
+
+  const [userRequests, leaveTypes, leaveBalances] = await Promise.all([
+    getLeaveRequestsForCurrentUser(userId),
+    getLeaveTypes(),
+    getLeaveBalances(userId),
+  ]);
+
+  const displayName = clerkUser?.firstName || appUser.name || "User";
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight font-headline">
+            Dashboard
+          </h1>
+          <p className="text-muted-foreground">
+            Welcome back, {displayName}. Here's your leave summary.
+          </p>
+        </div>
+        <RequestLeaveDialog
+          user={appUser}
+          leaveTypes={leaveTypes}
+          leaveBalances={leaveBalances}
+        />
+      </div>
+
+      <LeaveBalanceCards />
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Your Requests</CardTitle>
+          <CardDescription>
+            A summary of your recent and upcoming time off.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <LeaveRequestsTable
+            requests={userRequests}
+            variant="user"
+            currentUserId={userId}
+          />
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

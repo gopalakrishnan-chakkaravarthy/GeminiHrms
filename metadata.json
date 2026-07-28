@@ -1,0 +1,8 @@
+{
+  "name": "AbsenceAce - Leave Management System",
+  "description": "AI-Powered Leave Management and Payroll System",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
