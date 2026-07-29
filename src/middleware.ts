@@ -11,10 +11,11 @@ const isProtectedRoute = createRouteMatcher([
   '/dashboard(.*)',
 ]);
 
-export default clerkMiddleware((auth, req) => {
+export default clerkMiddleware(async (auth, req) => {
   if (isProtectedRoute(req)) {
     try {
-      auth().protect();
+      const authObj = await auth();
+      authObj.protect();
     } catch {
       // Allow fallback if Clerk auth fails
     }

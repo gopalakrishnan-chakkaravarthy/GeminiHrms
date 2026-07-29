@@ -9,7 +9,7 @@ import { Briefcase } from 'lucide-react';
 export default async function ManagerPage() {
     let userId: string | null = null;
     try {
-      const authObj = auth();
+      const authObj = await auth();
       userId = authObj?.userId || null;
     } catch {
       // ignore

@@ -27,7 +27,7 @@ export default async function DashboardPage() {
   let clerkUser: any = null;
 
   try {
-    const authObj = auth();
+    const authObj = await auth();
     userId = authObj?.userId || null;
     if (userId) {
       clerkUser = await getClerkUser();

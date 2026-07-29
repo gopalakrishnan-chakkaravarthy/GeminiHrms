@@ -13,7 +13,7 @@ export default async function DashboardLayout({
 }) {
   let userId: string | null = null;
   try {
-    const authObj = auth();
+    const authObj = await auth();
     userId = authObj?.userId || null;
   } catch {
     // ignore

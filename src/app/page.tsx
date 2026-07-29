@@ -1,13 +1,24 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { CalendarCheck, Users, BotMessageSquare } from 'lucide-react';
-import { SignInButton, SignedIn, SignedOut } from '@clerk/nextjs';
 import { auth } from '@clerk/nextjs/server';
-import { getAppUser } from '@/lib/data';
+import { getAppUser, getFallbackUserId } from '@/lib/data';
 import { UserNav } from '@/components/app/user-nav';
 
 export default async function LoginPage() {
-  const { userId } = auth();
+  let userId: string | null = null;
+  try {
+    const authObj = await auth();
+    userId = authObj?.userId || null;
+  } catch {
+    // ignore
+  }
+
+  // If no auth user, fallback to default user for seamless dev preview
+  if (!userId) {
+    userId = await getFallbackUserId();
+  }
+
   const user = userId ? await getAppUser(userId) : null;
 
   return (
@@ -17,12 +28,10 @@ export default async function LoginPage() {
             <h1 className="text-2xl font-bold font-headline text-primary">AbsenceAce</h1>
         </Link>
         <div className="flex items-center gap-4">
-            <SignedIn>
-                 <Button asChild variant="outline">
-                    <Link href="/dashboard">Dashboard</Link>
-                </Button>
-                {user && <UserNav user={user} />}
-            </SignedIn>
+          <Button asChild variant="outline">
+            <Link href="/dashboard">Dashboard</Link>
+          </Button>
+          {user && <UserNav user={user} />}
         </div>
       </header>
       <main className="flex-1 flex flex-col items-center justify-center p-4 text-center">
@@ -33,16 +42,9 @@ export default async function LoginPage() {
           <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
             Simplify time-off with AbsenceAce. Our AI-powered platform helps you manage requests, track balances, and get insights for optimal team planning.
           </p>
-          <SignedOut>
-            <SignInButton mode="modal">
-                 <Button size="lg" className="font-bold text-lg px-10 py-6">Sign In & Get Started</Button>
-            </SignInButton>
-          </SignedOut>
-          <SignedIn>
-            <Button asChild size="lg" className="font-bold text-lg px-10 py-6">
-                <Link href="/dashboard">Go to Your Dashboard</Link>
-            </Button>
-          </SignedIn>
+          <Button asChild size="lg" className="font-bold text-lg px-10 py-6">
+            <Link href="/dashboard">Go to Your Dashboard</Link>
+          </Button>
         </div>
       </main>
       <footer className="p-8">

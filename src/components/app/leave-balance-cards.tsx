@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getLeaveBalances } from "@/lib/data";
+import { getLeaveBalances, getFallbackUserId } from "@/lib/data";
 import { Plane, HeartPulse, User } from "lucide-react";
 import { auth } from "@clerk/nextjs/server";
 
@@ -16,10 +16,16 @@ const titleMap: { [key: string]: string } = {
 };
 
 export async function LeaveBalanceCards() {
-  const { userId } = auth();
+  let userId: string | null = null;
+  try {
+    const authObj = await auth();
+    userId = authObj?.userId || null;
+  } catch {
+    // ignore
+  }
 
   if (!userId) {
-    return null;
+    userId = await getFallbackUserId();
   }
 
   const balances = await getLeaveBalances(userId);

@@ -18,7 +18,7 @@
     "build:deploy": "npm run build && node create-deployment.js"
   },
   "dependencies": {
-    "@clerk/nextjs": "^5.2.8",
+    "@clerk/nextjs": "^7.6.2",
     "@genkit-ai/googleai": "^1.13.0",
     "@genkit-ai/next": "^1.13.0",
     "@hookform/resolvers": "^4.1.3",

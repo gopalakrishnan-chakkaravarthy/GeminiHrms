@@ -32,9 +32,11 @@ import { useToast } from "@/hooks/use-toast";
 import { ReviewLeaveRequestDialog } from "./review-leave-request-dialog";
 import {
   withdrawLeaveRequestAction,
-  addEventToGoogleCalendarAction,
 } from "@/app/dashboard/actions";
-import { deleteLeaveRequestByManagerAction } from "@/app/dashboard/admin/actions";
+import {
+  deleteLeaveRequestByManagerAction,
+  addEventToGoogleCalendarAction,
+} from "@/app/dashboard/admin/actions";
 import { DeleteConfirmationDialog } from "./delete-confirmation-dialog";
 
 type LeaveRequestsTableProps = {
