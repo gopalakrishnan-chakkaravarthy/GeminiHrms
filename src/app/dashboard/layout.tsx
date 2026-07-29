@@ -2,8 +2,9 @@ import type React from 'react';
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarFooter, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
 import { MainNav } from '@/components/app/main-nav';
 import { UserNav } from '@/components/app/user-nav';
+import { NotificationBell } from '@/components/app/notification-bell';
 import { Leaf } from 'lucide-react';
-import { getAllowedRoutesForUser, getAppUser, getFallbackUserId } from '@/lib/data';
+import { getAllowedRoutesForUser, getAppUser, getFallbackUserId, getAllLeaveRequests } from '@/lib/data';
 import { auth } from '@clerk/nextjs/server';
 
 export default async function DashboardLayout({
@@ -23,10 +24,13 @@ export default async function DashboardLayout({
     userId = await getFallbackUserId();
   }
 
-  const [allowedRoutes, user] = await Promise.all([
+  const [allowedRoutes, user, allRequests] = await Promise.all([
     getAllowedRoutesForUser(userId),
     getAppUser(userId),
+    getAllLeaveRequests(),
   ]);
+
+  const pendingRequests = allRequests.filter((r) => r.status === "Pending");
 
   if (!user) {
     return (
@@ -56,10 +60,13 @@ export default async function DashboardLayout({
       </Sidebar>
       <SidebarInset>
         <header className="flex h-14 items-center gap-4 border-b bg-background/95 backdrop-blur-sm px-4 lg:h-[60px] lg:px-6 sticky top-0 z-10">
-            <div className="flex-1">
+            <div className="flex-1 flex items-center gap-2">
                 <SidebarTrigger className="md:hidden" />
             </div>
-            <UserNav user={user} />
+            <div className="flex items-center gap-3">
+                <NotificationBell user={user} pendingRequests={pendingRequests} />
+                <UserNav user={user} />
+            </div>
         </header>
         <main className="flex-1 p-4 md:p-6">
             {children}
