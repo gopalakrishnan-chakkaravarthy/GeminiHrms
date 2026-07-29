@@ -8,6 +8,7 @@ import {
 } from "@/app/dashboard/admin/actions";
 import { useToast } from "@/hooks/use-toast";
 import type { LeaveRequest } from "@/lib/data";
+import { formatLocalDate } from "@/lib/utils";
 import { format } from "date-fns";
 import {
   Dialog,
@@ -142,8 +143,8 @@ export function ReviewLeaveRequestDialog({
             <div className="flex justify-between">
               <span className="font-semibold">Dates:</span>
               <span>
-                {format(new Date(request.startDate), "MMM dd, yyyy")} -{" "}
-                {format(new Date(request.endDate), "MMM dd, yyyy")}
+                {formatLocalDate(request.startDate, "MMM dd, yyyy")} -{" "}
+                {formatLocalDate(request.endDate, "MMM dd, yyyy")}
               </span>
             </div>
             <div className="flex justify-between">

@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { formatLocalDate } from "@/lib/utils";
 import type { User, LeaveRequest } from "@/lib/data";
 
 type NotificationBellProps = {
@@ -129,10 +130,10 @@ export function NotificationBell({ user, pendingRequests }: NotificationBellProp
               {pendingRequests.map((request) => {
                 const isUnread = !readIds.includes(request.id);
                 const startDateStr = request.startDate
-                  ? format(new Date(request.startDate), "MMM dd")
+                  ? formatLocalDate(request.startDate, "MMM dd")
                   : "";
                 const endDateStr = request.endDate
-                  ? format(new Date(request.endDate), "MMM dd")
+                  ? formatLocalDate(request.endDate, "MMM dd")
                   : "";
 
                 return (

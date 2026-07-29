@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { generateLeaveStatusEmail } from "@/lib/email";
 import { runPayrollForEmployees, db, getAppUser, getFallbackUserId } from "@/lib/data";
+import { formatLocalDate, parseLocalDate } from "@/lib/utils";
 import { format, parseISO } from "date-fns";
 import { z } from "zod";
 import { auth, clerkClient } from "@clerk/nextjs/server";
@@ -126,8 +127,8 @@ export async function reviewLeaveRequestAction(
                 e.name as "employeeName",
                 e.email as "employeeEmail",
                 lt.name as "leaveType",
-                lr.start_date,
-                lr.end_date,
+                TO_CHAR(lr.start_date, 'YYYY-MM-DD') as start_date,
+                TO_CHAR(lr.end_date, 'YYYY-MM-DD') as end_date,
                 lr.reason
             FROM leave_requests lr
             JOIN employees e ON lr.employee_id = e.id
@@ -166,8 +167,8 @@ export async function reviewLeaveRequestAction(
         recipientRole: "employee",
         employeeName: requestInfo.employeeName,
         leaveType: requestInfo.leaveType,
-        startDate: format(requestInfo.start_date, "yyyy-MM-dd"),
-        endDate: format(requestInfo.end_date, "yyyy-MM-dd"),
+        startDate: formatLocalDate(requestInfo.start_date, "yyyy-MM-dd"),
+        endDate: formatLocalDate(requestInfo.end_date, "yyyy-MM-dd"),
         status: newStatus as "Approved" | "Rejected",
         leaveBalanceCount: requestInfo?.leaveBalanceCount,
       });
@@ -179,8 +180,8 @@ export async function reviewLeaveRequestAction(
           description: `Leave Type: ${requestInfo.leaveType}. Reason: ${
             requestInfo.reason || "N/A"
           }`,
-          startDate: requestInfo.start_date,
-          endDate: requestInfo.end_date,
+          startDate: parseLocalDate(requestInfo.start_date),
+          endDate: parseLocalDate(requestInfo.end_date),
         });
         attachments = [
           {
@@ -340,9 +341,10 @@ export async function createHolidayAction(
 
   try {
     if (!db) throw new Error("Database not configured");
+    const holidayDate = parseLocalDate(date);
     await db.query("INSERT INTO holidays (name, date) VALUES ($1, $2)", [
       name,
-      new Date(date),
+      holidayDate,
     ]);
     revalidatePath("/dashboard/calendar");
     return { success: true, message: `Created holiday "${name}".` };

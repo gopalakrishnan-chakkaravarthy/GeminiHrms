@@ -3,6 +3,7 @@
 import * as React from "react";
 import { eachDayOfInterval, format } from "date-fns";
 import type { Holiday, LeaveRequest } from "@/lib/data";
+import { parseLocalDate } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
@@ -46,8 +47,8 @@ export function CompanyCalendar({
     return approvedLeaves.reduce(
       (acc, leave) => {
         const interval = eachDayOfInterval({
-          start: new Date(leave.startDate),
-          end: new Date(leave.endDate),
+          start: parseLocalDate(leave.startDate),
+          end: parseLocalDate(leave.endDate),
         });
         interval.forEach((day) => {
           const dateKey = format(day, "yyyy-MM-dd");
@@ -77,9 +78,9 @@ export function CompanyCalendar({
   }, [holidaysByDate, leavesByDate]);
 
   const modifiers = {
-    holiday: holidays.map((h) => new Date(h.date)),
+    holiday: holidays.map((h) => parseLocalDate(h.date)),
     leave: approvedLeaves.flatMap((l) =>
-      eachDayOfInterval({ start: new Date(l.startDate), end: new Date(l.endDate) })
+      eachDayOfInterval({ start: parseLocalDate(l.startDate), end: parseLocalDate(l.endDate) })
     ),
   };
 

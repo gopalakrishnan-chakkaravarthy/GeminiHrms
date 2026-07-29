@@ -248,6 +248,77 @@ export function PayslipView({ payslip }: PayslipViewProps) {
           <p className="font-mono text-[10px]">Document Hash: {payslip.id} • Generated on {formattedCreatedAt || "N/A"}</p>
         </div>
       </footer>
+
+      {/* AUTHORIZED SIGNATURE SECTION FOR MANAGER SIGN-OFF (Appears Specifically When Printing) */}
+      <section className="hidden print:block mt-8 pt-6 border-t-2 border-slate-300 break-inside-avoid">
+        <div className="bg-slate-50/80 p-5 rounded-lg border border-slate-200">
+          <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-200">
+            <div className="flex items-center gap-2">
+              <div className="h-2.5 w-2.5 rounded-full bg-emerald-600" />
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+                Authorized Manager Sign-Off & Approval
+              </h4>
+            </div>
+            <span className="text-[10px] text-slate-500 font-mono italic">
+              Required for Physical Copy Verification
+            </span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-6 text-xs text-slate-700">
+            {/* Manager Name & Title */}
+            <div className="space-y-4">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                  Manager / Supervisor Name
+                </p>
+                <div className="border-b border-slate-400 h-6 flex items-end pb-0.5">
+                  <span className="text-slate-400 text-[11px] italic">Print Name</span>
+                </div>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                  Designation / Title
+                </p>
+                <div className="border-b border-slate-400 h-6 flex items-end pb-0.5">
+                  <span className="text-slate-400 text-[11px] italic">Title</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Signature & Date */}
+            <div className="space-y-4">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                  Authorized Signature
+                </p>
+                <div className="border-b-2 border-slate-800 h-10 flex items-end pb-0.5">
+                  <span className="text-slate-300 text-[10px] italic">Sign Here</span>
+                </div>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                  Approval Date
+                </p>
+                <div className="border-b border-slate-400 h-6 flex items-end pb-0.5 font-mono text-[11px] text-slate-500">
+                  DD / MM / YYYY
+                </div>
+              </div>
+            </div>
+
+            {/* Official Stamp / Verification Seal */}
+            <div className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-lg p-2 text-center bg-white min-h-[90px]">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                Official Seal / Stamp
+              </span>
+              <span className="text-[9px] text-slate-300 mt-1">Affix company stamp here</span>
+            </div>
+          </div>
+
+          <p className="text-[10px] text-slate-500 italic mt-4 text-center border-t border-slate-200/60 pt-2">
+            I hereby certify that this payslip statement has been verified and authorized for official payroll disbursement.
+          </p>
+        </div>
+      </section>
     </div>
   );
 }

@@ -7,6 +7,7 @@ import {
 } from "@/ai/flows/leave-insights";
 import { generateLeaveStatusEmail } from "@/lib/email";
 import { db, getAppUser, getHolidays, getLeaveBalances, getFallbackUserId } from "@/lib/data";
+import { parseLocalDate } from "@/lib/utils";
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -155,8 +156,10 @@ export async function createLeaveRequestAction(
   const { leaveTypeId, dates, reason, isFirstDayHalf, isLastDayHalf } =
     validatedFields.data;
   const finalReason = reason || "";
-  const startDate = new Date(dates.from);
-  const endDate = new Date(dates.to);
+  const startDate = parseLocalDate(dates.from);
+  const endDate = parseLocalDate(dates.to);
+  const startDateStr = format(startDate, "yyyy-MM-dd");
+  const endDateStr = format(endDate, "yyyy-MM-dd");
 
   // Calculate total days including half-day options
   let days = differenceInDays(endDate, startDate) + 1;
@@ -171,7 +174,7 @@ export async function createLeaveRequestAction(
 
     // Holiday validation
     const holidays = await getHolidays(startDate.getFullYear());
-    const holidayDates = holidays.map((h) => h.date);
+    const holidayDates = holidays.map((h) => parseLocalDate(h.date));
     const requestedDates = eachDayOfInterval({
       start: startDate,
       end: endDate,
@@ -182,7 +185,7 @@ export async function createLeaveRequestAction(
         isSameDay(reqDate, holDate),
       );
       if (isHoliday) {
-        const holiday = holidays.find((h) => isSameDay(reqDate, h.date));
+        const holiday = holidays.find((h) => isSameDay(reqDate, parseLocalDate(h.date)));
         return {
           success: false,
           message: `Your request includes a company holiday (${format(
@@ -199,8 +202,8 @@ export async function createLeaveRequestAction(
       [
         userId,
         leaveTypeId,
-        startDate,
-        endDate,
+        startDateStr,
+        endDateStr,
         days,
         finalReason,
         "Pending",
@@ -228,8 +231,8 @@ export async function createLeaveRequestAction(
         recipientRole: "manager",
         employeeName: user.name,
         leaveType: leaveType.name,
-        startDate: format(startDate, "yyyy-MM-dd"),
-        endDate: format(endDate, "yyyy-MM-dd"),
+        startDate: startDateStr,
+        endDate: endDateStr,
         status: "Pending",
         leaveBalanceCount: leaveBalanceCount.toString(),
       })

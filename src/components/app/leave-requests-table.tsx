@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { formatLocalDate, parseLocalDate } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -64,8 +65,7 @@ export function LeaveRequestsTable({
 
   const formatDate = (date: Date | string) => {
     if (!date) return "";
-    const d = typeof date === "string" ? new Date(date) : date;
-    return format(d, "MMM dd, yyyy");
+    return formatLocalDate(date, "MMM dd, yyyy");
   };
 
   const getStatusBadge = (status: LeaveRequest["status"]) => {
@@ -142,14 +142,14 @@ export function LeaveRequestsTable({
   const handleAddToCalendar = (request: LeaveRequest) => {
     startTransition(async () => {
       setIsAddingToCalendar(request.id);
-      const startD = new Date(request.startDate);
-      const endD = new Date(request.endDate);
+      const startD = parseLocalDate(request.startDate);
+      const endD = parseLocalDate(request.endDate);
       endD.setDate(endD.getDate() + 1);
 
       const result = await addEventToGoogleCalendarAction(
         `Leave: ${request.employeeName} (${request.leaveType})`,
-        format(startD, "yyyy-MM-dd"),
-        format(endD, "yyyy-MM-dd")
+        formatLocalDate(startD, "yyyy-MM-dd"),
+        formatLocalDate(endD, "yyyy-MM-dd")
       );
 
       if (result.success) {
