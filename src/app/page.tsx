@@ -6,35 +6,44 @@ import { getAppUser, getFallbackUserId } from '@/lib/data';
 import { UserNav } from '@/components/app/user-nav';
 
 export default async function LoginPage() {
-  let userId: string | null = null;
+  let clerkUserId: string | null = null;
   try {
     const authObj = await auth();
-    userId = authObj?.userId || null;
+    clerkUserId = authObj?.userId || null;
   } catch {
     // ignore
   }
 
-  // If no auth user, fallback to default user for seamless dev preview
-  if (!userId) {
-    userId = await getFallbackUserId();
-  }
-
-  const user = userId ? await getAppUser(userId) : null;
+  const user = clerkUserId ? await getAppUser(clerkUserId) : null;
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <header className="p-4 md:p-6 flex justify-between items-center">
+    <div className="flex flex-col min-h-screen bg-background">
+      <header className="p-4 md:p-6 flex justify-between items-center border-b">
         <Link href="/">
-            <h1 className="text-2xl font-bold font-headline text-primary">AbsenceAce</h1>
+          <h1 className="text-2xl font-bold font-headline text-primary">AbsenceAce</h1>
         </Link>
-        <div className="flex items-center gap-4">
-          <Button asChild variant="outline">
-            <Link href="/dashboard">Dashboard</Link>
-          </Button>
-          {user && <UserNav user={user} />}
+        <div className="flex items-center gap-3">
+          {clerkUserId && user ? (
+            <>
+              <Button asChild variant="outline">
+                <Link href="/dashboard">Dashboard</Link>
+              </Button>
+              <UserNav user={user} />
+            </>
+          ) : (
+            <>
+              <Button variant="ghost" asChild>
+                <Link href="/sign-in">Sign In</Link>
+              </Button>
+              <Button asChild>
+                <Link href="/sign-up">Sign Up</Link>
+              </Button>
+            </>
+          )}
         </div>
       </header>
-      <main className="flex-1 flex flex-col items-center justify-center p-4 text-center">
+
+      <main className="flex-1 flex flex-col items-center justify-center p-6 text-center">
         <div className="max-w-3xl">
           <h2 className="text-4xl md:text-6xl font-bold font-headline text-foreground mb-4">
             Intelligent Leave Management
@@ -42,9 +51,21 @@ export default async function LoginPage() {
           <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
             Simplify time-off with AbsenceAce. Our AI-powered platform helps you manage requests, track balances, and get insights for optimal team planning.
           </p>
-          <Button asChild size="lg" className="font-bold text-lg px-10 py-6">
-            <Link href="/dashboard">Go to Your Dashboard</Link>
-          </Button>
+
+          {clerkUserId ? (
+            <Button asChild size="lg" className="font-bold text-lg px-10 py-6 shadow-md">
+              <Link href="/dashboard">Go to Your Dashboard</Link>
+            </Button>
+          ) : (
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Button asChild size="lg" className="font-bold text-lg px-10 py-6 shadow-md w-full sm:w-auto">
+                <Link href="/sign-in">Sign In</Link>
+              </Button>
+              <Button asChild size="lg" variant="outline" className="font-semibold text-lg px-8 py-6 w-full sm:w-auto">
+                <Link href="/dashboard">Try Demo Dashboard</Link>
+              </Button>
+            </div>
+          )}
         </div>
       </main>
       <footer className="p-8">

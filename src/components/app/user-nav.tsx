@@ -28,10 +28,9 @@ export function UserNav({ user }: UserNavProps) {
   const { signOut } = useClerk();
   const router = useRouter();
 
-  const handleSignOut = () => {
-    signOut().then(() => {
-      router.push("/");
-    });
+  const handleSignOut = async () => {
+    await signOut({ redirectUrl: "/sign-in" });
+    window.location.href = "/sign-in";
   };
 
   return (
