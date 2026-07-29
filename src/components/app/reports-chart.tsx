@@ -5,6 +5,7 @@ import {
   ChartContainer,
   ChartTooltipContent,
   ChartLegend,
+  ChartLegendContent,
   ChartTooltip,
 } from "@/components/ui/chart";
 
@@ -45,7 +46,7 @@ export function ReportsChart({ data, dataKey }: ReportsChartProps) {
           cursor={false}
           content={<ChartTooltipContent indicator="dot" />}
         />
-        <ChartLegend content={<ChartLegend />} />
+        <ChartLegend content={<ChartLegendContent />} />
         <Bar dataKey="requests" fill="var(--color-requests)" radius={4} />
       </BarChart>
     </ChartContainer>
