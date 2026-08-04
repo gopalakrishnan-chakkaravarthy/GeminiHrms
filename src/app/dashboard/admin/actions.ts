@@ -1428,6 +1428,36 @@ export async function deletePayslipAction(id: string): Promise<DeleteResult> {
   );
 }
 
+export async function updatePayslipStatusAction(
+  id: string,
+  newStatus: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    if (db) {
+      await db.query(
+        "UPDATE payslips SET status = $1 WHERE id = $2",
+        [newStatus, id]
+      );
+    } else {
+      const found = mock.allPayslips.find((p) => p.id === id);
+      if (found) {
+        found.status = newStatus;
+      }
+    }
+    revalidatePath("/dashboard/admin/payroll/payslips");
+    return {
+      success: true,
+      message: `Payslip status updated to '${newStatus}'`,
+    };
+  } catch (error) {
+    console.error("Error updating payslip status:", error);
+    return {
+      success: false,
+      message: "Failed to update payslip status.",
+    };
+  }
+}
+
 const RunPayrollSchema = z.object({
   employeeIds: z.string().min(1, "Please select at least one employee."),
   payPeriod: z.object({

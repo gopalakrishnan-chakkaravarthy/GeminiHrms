@@ -84,6 +84,7 @@ export type MockPayslip = {
   gross_earnings: string;
   total_deductions: string;
   net_pay: string;
+  status?: string;
   details: PayslipDetailsItem[];
   created_at: Date;
 };

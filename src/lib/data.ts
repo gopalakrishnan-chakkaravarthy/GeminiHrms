@@ -166,6 +166,7 @@ export type PopulatedPayslip = {
   grossEarnings: number;
   totalDeductions: number;
   netPay: number;
+  status?: string;
   details: PayslipDetailsItem[];
   createdAt: Date;
 };
@@ -178,6 +179,7 @@ export type PopulatedPayslipSummary = {
   grossEarnings?: number;
   totalDeductions?: number;
   netPay: number;
+  status?: string;
   createdAt: Date;
 };
 
@@ -783,8 +785,9 @@ export async function getPopulatedEmployeePayrollSettings(): Promise<
 export async function getPayslips(): Promise<PopulatedPayslipSummary[]> {
   if (!db) {
     console.warn("DATABASE NOT CONFIGURED: Using mock data for getPayslips");
+    const statuses = ["Sent", "Processed", "Draft"];
     const formattedMock = mock.allPayslips
-      .map((p) => ({
+      .map((p, idx) => ({
         id: p.id,
         employeeName:
           mock.allEmployees.find((e) => e.id === p.employee_id)?.name ||
@@ -794,6 +797,7 @@ export async function getPayslips(): Promise<PopulatedPayslipSummary[]> {
         grossEarnings: parseFloat(p.gross_earnings || "0"),
         totalDeductions: parseFloat(p.total_deductions || "0"),
         netPay: parseFloat(p.net_pay),
+        status: p.status || statuses[idx % statuses.length],
         createdAt: p.created_at,
       }))
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
@@ -810,6 +814,7 @@ export async function getPayslips(): Promise<PopulatedPayslipSummary[]> {
                 p.gross_earnings as "grossEarnings",
                 p.total_deductions as "totalDeductions",
                 p.net_pay as "netPay",
+                COALESCE(p.status, 'Processed') as "status",
                 p.created_at as "createdAt"
             FROM payslips p
             LEFT JOIN employees e ON p.employee_id = e.id
@@ -820,6 +825,7 @@ export async function getPayslips(): Promise<PopulatedPayslipSummary[]> {
       grossEarnings: parseFloat(row.grossEarnings || 0),
       totalDeductions: parseFloat(row.totalDeductions || 0),
       netPay: parseFloat(row.netPay || 0),
+      status: row.status || "Processed",
     }));
     return toPlain(mapped);
   } catch (error) {

@@ -25,6 +25,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import {
   Dialog,
@@ -48,14 +49,17 @@ import {
   Calendar,
   DollarSign,
   Filter,
+  Send,
+  FileClock,
+  CheckCircle2,
 } from "lucide-react";
 import Link from "next/link";
 import type { PopulatedPayslipSummary } from "@/lib/data";
 import { format } from "date-fns";
-import { deletePayslipAction } from "@/app/dashboard/admin/actions";
+import { deletePayslipAction, updatePayslipStatusAction } from "@/app/dashboard/admin/actions";
 import { useToast } from "@/hooks/use-toast";
 import { DeleteConfirmationDialog } from "./delete-confirmation-dialog";
-import { formatLocalDate } from "@/lib/utils";
+import { formatLocalDate, cn } from "@/lib/utils";
 
 type PayslipsTableProps = {
   payslips: PopulatedPayslipSummary[];
@@ -64,6 +68,7 @@ type PayslipsTableProps = {
 export function PayslipsTable({ payslips }: PayslipsTableProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedYear, setSelectedYear] = useState<string>("all");
+  const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
   const [selectedPayslip, setSelectedPayslip] =
@@ -74,6 +79,34 @@ export function PayslipsTable({ payslips }: PayslipsTableProps) {
   const formatDate = (date: Date | string) => {
     if (!date) return "";
     return formatLocalDate(date, "MMM dd, yyyy");
+  };
+
+  const getStatusBadge = (status?: string) => {
+    const s = (status || "Processed").toLowerCase();
+    switch (s) {
+      case "sent":
+        return {
+          label: "Sent",
+          className:
+            "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border-emerald-300 font-medium",
+          icon: Send,
+        };
+      case "draft":
+        return {
+          label: "Draft",
+          className:
+            "bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border-amber-300 font-medium",
+          icon: FileClock,
+        };
+      case "processed":
+      default:
+        return {
+          label: "Processed",
+          className:
+            "bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300 border-blue-300 font-medium",
+          icon: CheckCircle2,
+        };
+    }
   };
 
   // Derive available years from data
@@ -88,7 +121,7 @@ export function PayslipsTable({ payslips }: PayslipsTableProps) {
     return Array.from(years).sort((a, b) => Number(b) - Number(a));
   }, [payslips]);
 
-  // Filtered payslips based on search & year
+  // Filtered payslips based on search, year & status
   const filteredPayslips = useMemo(() => {
     return payslips.filter((p) => {
       const query = searchQuery.toLowerCase().trim();
@@ -100,9 +133,13 @@ export function PayslipsTable({ payslips }: PayslipsTableProps) {
       const year = new Date(p.payPeriodStart).getFullYear().toString();
       const matchesYear = selectedYear === "all" || year === selectedYear;
 
-      return matchesSearch && matchesYear;
+      const matchesStatus =
+        selectedStatus === "all" ||
+        (p.status || "Processed").toLowerCase() === selectedStatus.toLowerCase();
+
+      return matchesSearch && matchesYear && matchesStatus;
     });
-  }, [payslips, searchQuery, selectedYear]);
+  }, [payslips, searchQuery, selectedYear, selectedStatus]);
 
   // Calculate totals for filtered payslips
   const totals = useMemo(() => {
@@ -117,11 +154,28 @@ export function PayslipsTable({ payslips }: PayslipsTableProps) {
     );
   }, [filteredPayslips]);
 
-  const hasActiveFilters = searchQuery !== "" || selectedYear !== "all";
+  const hasActiveFilters =
+    searchQuery !== "" || selectedYear !== "all" || selectedStatus !== "all";
 
   const handleClearFilters = () => {
     setSearchQuery("");
     setSelectedYear("all");
+    setSelectedStatus("all");
+  };
+
+  const handleUpdateStatus = (id: string, newStatus: string) => {
+    startTransition(async () => {
+      const res = await updatePayslipStatusAction(id, newStatus);
+      if (res.success) {
+        toast({ title: "Status Updated", description: res.message });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: res.message,
+        });
+      }
+    });
   };
 
   // Export CSV
@@ -143,6 +197,7 @@ export function PayslipsTable({ payslips }: PayslipsTableProps) {
       "Gross Earnings ($)",
       "Total Deductions ($)",
       "Net Pay ($)",
+      "Workflow Status",
       "Generated On",
     ];
 
@@ -154,6 +209,7 @@ export function PayslipsTable({ payslips }: PayslipsTableProps) {
       `"${(p.grossEarnings || 0).toFixed(2)}"`,
       `"${(p.totalDeductions || 0).toFixed(2)}"`,
       `"${p.netPay.toFixed(2)}"`,
+      `"${p.status || "Processed"}"`,
       `"${formatDate(p.createdAt)}"`,
     ]);
 
@@ -272,6 +328,28 @@ export function PayslipsTable({ payslips }: PayslipsTableProps) {
             </SelectContent>
           </Select>
 
+          {/* Status Select Filter */}
+          <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+            <SelectTrigger className="w-full sm:w-36 h-9 text-xs bg-white dark:bg-slate-950">
+              <Filter className="mr-2 h-3.5 w-3.5 text-slate-400" />
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" className="text-xs">
+                All Statuses
+              </SelectItem>
+              <SelectItem value="draft" className="text-xs">
+                Draft
+              </SelectItem>
+              <SelectItem value="processed" className="text-xs">
+                Processed
+              </SelectItem>
+              <SelectItem value="sent" className="text-xs">
+                Sent
+              </SelectItem>
+            </SelectContent>
+          </Select>
+
           {hasActiveFilters && (
             <Button
               variant="ghost"
@@ -358,6 +436,7 @@ export function PayslipsTable({ payslips }: PayslipsTableProps) {
           <TableRow>
             <TableHead>Employee</TableHead>
             <TableHead>Pay Period</TableHead>
+            <TableHead>Status</TableHead>
             <TableHead className="text-right">Net Pay</TableHead>
             <TableHead className="text-right">Generated On</TableHead>
             <TableHead className="text-right w-[100px]">Actions</TableHead>
@@ -365,56 +444,101 @@ export function PayslipsTable({ payslips }: PayslipsTableProps) {
         </TableHeader>
         <TableBody>
           {filteredPayslips.length > 0 ? (
-            filteredPayslips.map((payslip) => (
-              <TableRow key={payslip.id}>
-                <TableCell className="font-medium">{payslip.employeeName}</TableCell>
-                <TableCell>
-                  {formatDate(payslip.payPeriodStart)} - {formatDate(payslip.payPeriodEnd)}
-                </TableCell>
-                <TableCell className="text-right font-semibold text-emerald-700 dark:text-emerald-400">
-                  ${payslip.netPay.toFixed(2)}
-                </TableCell>
-                <TableCell className="text-right text-muted-foreground">
-                  {formatDate(payslip.createdAt)}
-                </TableCell>
-                <TableCell className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" disabled={isPending}>
-                        <MoreHorizontal className="h-4 w-4" />
-                        <span className="sr-only">Actions</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem asChild>
-                        <Link href={`/dashboard/admin/payroll/payslips/${payslip.id}`}>
-                          <Eye className="mr-2 h-4 w-4" /> View Details
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link
-                          href={`/dashboard/admin/payroll/payslips/${payslip.id}/print`}
-                          target="_blank"
+            filteredPayslips.map((payslip) => {
+              const badge = getStatusBadge(payslip.status);
+              const BadgeIcon = badge.icon;
+
+              return (
+                <TableRow key={payslip.id}>
+                  <TableCell className="font-medium">{payslip.employeeName}</TableCell>
+                  <TableCell>
+                    {formatDate(payslip.payPeriodStart)} - {formatDate(payslip.payPeriodEnd)}
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs rounded-full border shadow-2xs transition-colors",
+                        badge.className
+                      )}
+                    >
+                      <BadgeIcon className="h-3 w-3" />
+                      {badge.label}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right font-semibold text-emerald-700 dark:text-emerald-400 font-mono">
+                    ${payslip.netPay.toFixed(2)}
+                  </TableCell>
+                  <TableCell className="text-right text-muted-foreground">
+                    {formatDate(payslip.createdAt)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" disabled={isPending}>
+                          <MoreHorizontal className="h-4 w-4" />
+                          <span className="sr-only">Actions</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuItem asChild>
+                          <Link href={`/dashboard/admin/payroll/payslips/${payslip.id}`}>
+                            <Eye className="mr-2 h-4 w-4" /> View Details
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link
+                            href={`/dashboard/admin/payroll/payslips/${payslip.id}/print`}
+                            target="_blank"
+                          >
+                            <Printer className="mr-2 h-4 w-4" /> Print Payslip
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-2 py-1">
+                          Update Workflow Status
+                        </DropdownMenuLabel>
+                        <DropdownMenuItem
+                          onClick={() => handleUpdateStatus(payslip.id, "Draft")}
+                          disabled={isPending || payslip.status === "Draft"}
+                          className="text-xs cursor-pointer"
                         >
-                          <Printer className="mr-2 h-4 w-4" /> Print Payslip
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        className="text-red-600 focus:text-red-600"
-                        onClick={() => handleDelete(payslip)}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))
+                          <FileClock className="mr-2 h-3.5 w-3.5 text-amber-600" />
+                          Mark as Draft
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleUpdateStatus(payslip.id, "Processed")}
+                          disabled={isPending || payslip.status === "Processed"}
+                          className="text-xs cursor-pointer"
+                        >
+                          <CheckCircle2 className="mr-2 h-3.5 w-3.5 text-blue-600" />
+                          Mark as Processed
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleUpdateStatus(payslip.id, "Sent")}
+                          disabled={isPending || payslip.status === "Sent"}
+                          className="text-xs cursor-pointer"
+                        >
+                          <Send className="mr-2 h-3.5 w-3.5 text-emerald-600" />
+                          Mark as Sent
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-red-600 focus:text-red-600 cursor-pointer"
+                          onClick={() => handleDelete(payslip)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              );
+            })
           ) : (
             <TableRow>
-              <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+              <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                 No payslips found matching your search filters.
               </TableCell>
             </TableRow>
@@ -458,6 +582,7 @@ export function PayslipsTable({ payslips }: PayslipsTableProps) {
                 <span className="font-semibold block text-slate-900">Filter Applied:</span>
                 <span>Search: {searchQuery || "All Employees"}</span>
                 <span className="block">Year: {selectedYear === "all" ? "All Years" : selectedYear}</span>
+                <span className="block">Status: {selectedStatus === "all" ? "All Statuses" : selectedStatus}</span>
               </div>
             </div>
 
@@ -497,6 +622,7 @@ export function PayslipsTable({ payslips }: PayslipsTableProps) {
                     <th className="p-2.5">#</th>
                     <th className="p-2.5">Employee Name</th>
                     <th className="p-2.5">Pay Period</th>
+                    <th className="p-2.5">Status</th>
                     <th className="p-2.5 text-right">Gross</th>
                     <th className="p-2.5 text-right">Deductions</th>
                     <th className="p-2.5 text-right">Net Pay</th>
@@ -511,6 +637,7 @@ export function PayslipsTable({ payslips }: PayslipsTableProps) {
                       <td className="p-2.5 text-slate-600">
                         {formatDate(p.payPeriodStart)} - {formatDate(p.payPeriodEnd)}
                       </td>
+                      <td className="p-2.5 font-medium">{p.status || "Processed"}</td>
                       <td className="p-2.5 text-right font-mono">
                         ${(p.grossEarnings || 0).toFixed(2)}
                       </td>
