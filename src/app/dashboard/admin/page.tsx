@@ -4,7 +4,9 @@ import {
     getAllLeaveRequests, 
     getAdminDashboardStats, 
     getLeaveReportByDepartment, 
-    getLeaveReportByEmployee 
+    getLeaveReportByEmployee,
+    getEmployees,
+    getLeaveTypes,
 } from '@/lib/data';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ArrowRight, ShieldCheck, ClipboardList, UsersRound, Repeat, Users, Building2, BarChart3, Hourglass, Landmark, Lock } from 'lucide-react';
@@ -12,6 +14,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { StatCard } from '@/components/app/stat-card';
 import { ReportsChart } from '@/components/app/reports-chart';
+import { CreateLeaveOnBehalfDialog } from '@/components/app/create-leave-on-behalf-dialog';
 
 
 function ManagementCard({ title, description, href, icon: Icon }: { title: string, description: string, href: string, icon: React.ElementType }) {
@@ -42,6 +45,8 @@ export default async function AdminPage() {
   const stats = await getAdminDashboardStats();
   const departmentReport = await getLeaveReportByDepartment();
   const employeeReport = await getLeaveReportByEmployee();
+  const allEmployees = await getEmployees();
+  const allLeaveTypes = await getLeaveTypes();
 
   const pendingRequests = allLeaveRequests.filter(req => req.status === 'Pending');
   const approvedRequests = allLeaveRequests.filter(req => req.status === 'Approved');
@@ -49,9 +54,12 @@ export default async function AdminPage() {
 
   return (
     <div className="space-y-6">
-        <div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight font-headline">Admin Dashboard</h1>
-            <p className="text-muted-foreground">An overview of your entire leave management system.</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+                <h1 className="text-2xl md:text-3xl font-bold tracking-tight font-headline">Admin Dashboard</h1>
+                <p className="text-muted-foreground">An overview of your entire leave management system.</p>
+            </div>
+            <CreateLeaveOnBehalfDialog employees={allEmployees} leaveTypes={allLeaveTypes} />
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -83,29 +91,31 @@ export default async function AdminPage() {
         </div>
 
         <Card>
-            <CardHeader>
-                <CardTitle>Employee Requests</CardTitle>
-                <CardDescription>Review, approve, or reject pending requests.</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                    <CardTitle>Employee Requests</CardTitle>
+                    <CardDescription>Review, approve, or reject pending requests.</CardDescription>
+                </div>
             </CardHeader>
             <CardContent>
                 <Tabs defaultValue="pending">
                     <TabsList className="grid w-full grid-cols-4 md:w-[400px]">
-                        <TabsTrigger value="pending">Pending</TabsTrigger>
+                        <TabsTrigger value="pending">Pending ({pendingRequests.length})</TabsTrigger>
                         <TabsTrigger value="approved">Approved</TabsTrigger>
                         <TabsTrigger value="rejected">Rejected</TabsTrigger>
                         <TabsTrigger value="all">All</TabsTrigger>
                     </TabsList>
                     <TabsContent value="pending">
-                        <LeaveRequestsTable requests={pendingRequests} variant="admin" />
+                        <LeaveRequestsTable requests={pendingRequests} variant="admin" employees={allEmployees} leaveTypes={allLeaveTypes} />
                     </TabsContent>
                     <TabsContent value="approved">
-                        <LeaveRequestsTable requests={approvedRequests} variant="admin" />
+                        <LeaveRequestsTable requests={approvedRequests} variant="admin" employees={allEmployees} leaveTypes={allLeaveTypes} />
                     </TabsContent>
                     <TabsContent value="rejected">
-                        <LeaveRequestsTable requests={rejectedRequests} variant="admin" />
+                        <LeaveRequestsTable requests={rejectedRequests} variant="admin" employees={allEmployees} leaveTypes={allLeaveTypes} />
                     </TabsContent>
                     <TabsContent value="all">
-                        <LeaveRequestsTable requests={allLeaveRequests} variant="admin" />
+                        <LeaveRequestsTable requests={allLeaveRequests} variant="admin" employees={allEmployees} leaveTypes={allLeaveTypes} />
                     </TabsContent>
                 </Tabs>
             </CardContent>

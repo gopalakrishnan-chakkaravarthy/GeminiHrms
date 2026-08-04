@@ -175,6 +175,8 @@ export type PopulatedPayslipSummary = {
   employeeName: string;
   payPeriodStart: Date;
   payPeriodEnd: Date;
+  grossEarnings?: number;
+  totalDeductions?: number;
   netPay: number;
   createdAt: Date;
 };
@@ -789,6 +791,8 @@ export async function getPayslips(): Promise<PopulatedPayslipSummary[]> {
           "Unknown",
         payPeriodStart: p.pay_period_start,
         payPeriodEnd: p.pay_period_end,
+        grossEarnings: parseFloat(p.gross_earnings || "0"),
+        totalDeductions: parseFloat(p.total_deductions || "0"),
         netPay: parseFloat(p.net_pay),
         createdAt: p.created_at,
       }))
@@ -803,13 +807,20 @@ export async function getPayslips(): Promise<PopulatedPayslipSummary[]> {
                 COALESCE(e.name, 'Former Employee') as "employeeName",
                 p.pay_period_start as "payPeriodStart",
                 p.pay_period_end as "payPeriodEnd",
+                p.gross_earnings as "grossEarnings",
+                p.total_deductions as "totalDeductions",
                 p.net_pay as "netPay",
                 p.created_at as "createdAt"
             FROM payslips p
             LEFT JOIN employees e ON p.employee_id = e.id
             ORDER BY p.created_at DESC
         `);
-    const mapped = data.rows.map((row) => ({ ...row, netPay: parseFloat(row.netPay || 0) }));
+    const mapped = data.rows.map((row) => ({
+      ...row,
+      grossEarnings: parseFloat(row.grossEarnings || 0),
+      totalDeductions: parseFloat(row.totalDeductions || 0),
+      netPay: parseFloat(row.netPay || 0),
+    }));
     return toPlain(mapped);
   } catch (error) {
     console.error("Database Error:", error);

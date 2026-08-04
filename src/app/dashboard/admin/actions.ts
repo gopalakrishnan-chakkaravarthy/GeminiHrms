@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { generateLeaveStatusEmail } from "@/lib/email";
 import { runPayrollForEmployees, db, getAppUser, getFallbackUserId } from "@/lib/data";
 import { formatLocalDate, parseLocalDate } from "@/lib/utils";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, differenceInDays } from "date-fns";
 import { z } from "zod";
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import nodemailer from "nodemailer";
@@ -220,6 +220,212 @@ export async function reviewLeaveRequestAction(
     return {
       success: false,
       message: `Failed to update request. ${errorMessage}`,
+    };
+  }
+}
+
+export async function batchReviewLeaveRequestsAction(
+  requestIds: string[],
+  action: "approve" | "reject",
+  rejectionReason?: string
+): Promise<{ success: boolean; message: string; count?: number }> {
+  if (!requestIds || requestIds.length === 0) {
+    return { success: false, message: "No leave requests selected." };
+  }
+
+  let managerId: string | null = null;
+  try {
+    const authObj = await auth();
+    managerId = authObj?.userId || null;
+  } catch {
+    // ignore
+  }
+  if (!managerId) {
+    managerId = await getFallbackUserId();
+  }
+
+  const newStatus = action === "approve" ? "Approved" : "Rejected";
+
+  try {
+    if (!db) throw new Error("Database not configured");
+
+    const user = await getAppUser(managerId);
+    const isAdmin = user?.roleName === "Administrator";
+
+    let queryText = "";
+    let params: any[] = [];
+
+    if (isAdmin) {
+      queryText = `
+        UPDATE leave_requests 
+        SET status = $1, rejection_reason = $2 
+        WHERE id = ANY($3::text[]) AND status = 'Pending'
+        RETURNING id, employee_id, leave_type_id, start_date, end_date, reason;
+      `;
+      params = [newStatus, newStatus === "Rejected" ? rejectionReason || null : null, requestIds];
+    } else {
+      queryText = `
+        UPDATE leave_requests 
+        SET status = $1, rejection_reason = $2 
+        WHERE id = ANY($3::text[]) AND manager_id = $4 AND status = 'Pending'
+        RETURNING id, employee_id, leave_type_id, start_date, end_date, reason;
+      `;
+      params = [newStatus, newStatus === "Rejected" ? rejectionReason || null : null, requestIds, managerId];
+    }
+
+    const res = await db.query(queryText, params);
+    const updatedCount = res.rowCount || 0;
+
+    for (const row of res.rows) {
+      try {
+        const empRes = await db.query("SELECT name, email FROM employees WHERE id = $1", [row.employee_id]);
+        const ltRes = await db.query("SELECT name FROM leave_types WHERE id = $1", [row.leave_type_id]);
+        if (empRes.rows.length > 0 && ltRes.rows.length > 0) {
+          const emp = empRes.rows[0];
+          const lt = ltRes.rows[0];
+          if (emp.email) {
+            const startDateStr = formatLocalDate(row.start_date, "yyyy-MM-dd");
+            const endDateStr = formatLocalDate(row.end_date, "yyyy-MM-dd");
+            const emailContent = await generateLeaveStatusEmail({
+              recipientName: emp.name,
+              recipientRole: "employee",
+              employeeName: emp.name,
+              leaveType: lt.name,
+              startDate: startDateStr,
+              endDate: endDateStr,
+              status: newStatus as "Approved" | "Rejected",
+            });
+            let attachments;
+            if (newStatus === "Approved") {
+              const icsContent = generateIcsContent({
+                title: `Leave: ${emp.name}`,
+                description: `Leave Type: ${lt.name}. Reason: ${row.reason || "N/A"}`,
+                startDate: parseLocalDate(row.start_date),
+                endDate: parseLocalDate(row.end_date),
+              });
+              attachments = [{ filename: "invite.ics", content: icsContent, contentType: "text/calendar" }];
+            }
+            sendEmail(emp.email, emailContent.subject, emailContent.body, attachments).catch(() => {});
+          }
+        }
+      } catch (err) {
+        console.error("Error sending batch status email:", err);
+      }
+    }
+
+    revalidatePath("/dashboard/manager");
+    revalidatePath("/dashboard/admin");
+    revalidatePath("/dashboard");
+
+    return {
+      success: true,
+      message: `Successfully ${newStatus.toLowerCase()} ${updatedCount} leave request${updatedCount === 1 ? "" : "s"}.`,
+      count: updatedCount,
+    };
+  } catch (error) {
+    console.error(`Failed batch review:`, error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Batch operation failed.",
+    };
+  }
+}
+
+export async function createLeaveOnBehalfAction(
+  prevState: FormState,
+  formData: FormData
+): Promise<FormState> {
+  let adminId: string | null = null;
+  try {
+    const authObj = await auth();
+    adminId = authObj?.userId || null;
+  } catch {
+    // ignore
+  }
+  if (!adminId) {
+    adminId = await getFallbackUserId();
+  }
+
+  const employeeId = formData.get("employeeId") as string;
+  const leaveTypeId = formData.get("leaveTypeId") as string;
+  const fromStr = formData.get("dates.from") as string;
+  const toStr = formData.get("dates.to") as string;
+  const reason = (formData.get("reason") as string) || "Created on behalf by Admin/Manager";
+  const statusOption = (formData.get("status") as string) || "Approved";
+  const isFirstDayHalf = formData.get("isFirstDayHalf") === "true" || formData.get("isFirstDayHalf") === "on";
+  const isLastDayHalf = formData.get("isLastDayHalf") === "true" || formData.get("isLastDayHalf") === "on";
+
+  if (!employeeId || !leaveTypeId || !fromStr || !toStr) {
+    return {
+      success: false,
+      message: "Please fill in all required fields (Employee, Leave Type, and Dates).",
+    };
+  }
+
+  const startDate = parseLocalDate(fromStr);
+  const endDate = parseLocalDate(toStr);
+  const startDateStr = format(startDate, "yyyy-MM-dd");
+  const endDateStr = format(endDate, "yyyy-MM-dd");
+
+  let days = differenceInDays(endDate, startDate) + 1;
+  if (isFirstDayHalf) days -= 0.5;
+  if (isLastDayHalf && startDate.getTime() !== endDate.getTime()) days -= 0.5;
+  if (days <= 0) {
+    return { success: false, message: "End date must be on or after start date." };
+  }
+
+  try {
+    if (!db) throw new Error("Database not configured");
+
+    const targetEmp = await getAppUser(employeeId);
+    if (!targetEmp) {
+      return { success: false, message: "Selected employee not found." };
+    }
+
+    await db.query(
+      `INSERT INTO leave_requests (employee_id, leave_type_id, start_date, end_date, days, reason, status, manager_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        employeeId,
+        leaveTypeId,
+        startDateStr,
+        endDateStr,
+        days,
+        reason,
+        statusOption,
+        targetEmp.managerId || adminId,
+      ]
+    );
+
+    const ltResult = await db.query("SELECT name FROM leave_types WHERE id = $1", [leaveTypeId]);
+    const leaveTypeName = ltResult.rows[0]?.name || "Leave";
+
+    if (targetEmp.email) {
+      const emailContent = await generateLeaveStatusEmail({
+        recipientName: targetEmp.name,
+        recipientRole: "employee",
+        employeeName: targetEmp.name,
+        leaveType: leaveTypeName,
+        startDate: startDateStr,
+        endDate: endDateStr,
+        status: statusOption as "Approved" | "Pending",
+      });
+      sendEmail(targetEmp.email, emailContent.subject, emailContent.body).catch(() => {});
+    }
+
+    revalidatePath("/dashboard/admin");
+    revalidatePath("/dashboard/manager");
+    revalidatePath("/dashboard");
+
+    return {
+      success: true,
+      message: `Successfully created ${statusOption.toLowerCase()} leave request for ${targetEmp.name}.`,
+    };
+  } catch (error) {
+    console.error("Failed to create leave on behalf:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to create leave request.",
     };
   }
 }
