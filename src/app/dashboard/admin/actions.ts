@@ -1157,10 +1157,11 @@ export async function createEmployeeAction(
     );
 
     // Insert initial leave balances
+    const currentYear = new Date().getFullYear();
     for (const policy of policiesRes.rows) {
       await client.query(
-        "INSERT INTO leave_balances (employee_id, leave_type_id, balance) VALUES ($1, $2, $3)",
-        [finalId, policy.leave_type_id, policy.days_allowed],
+        "INSERT INTO leave_balances (employee_id, leave_type_id, balance, year) VALUES ($1, $2, $3, $4)",
+        [finalId, policy.leave_type_id, policy.days_allowed, currentYear],
       );
     }
 
@@ -1301,10 +1302,11 @@ export async function updateEmployeeAction(
         [roleId],
       );
 
+      const currentYear = new Date().getFullYear();
       for (const policy of policiesRes.rows) {
         await client.query(
-          "INSERT INTO leave_balances (employee_id, leave_type_id, balance) VALUES ($1, $2, $3)",
-          [id, policy.leave_type_id, policy.days_allowed],
+          "INSERT INTO leave_balances (employee_id, leave_type_id, balance, year) VALUES ($1, $2, $3, $4)",
+          [id, policy.leave_type_id, policy.days_allowed, currentYear],
         );
       }
     }
