@@ -7,7 +7,9 @@ import {
     getLeaveReportByEmployee,
     getEmployees,
     getLeaveTypes,
+    getYearlyLeaveBalances,
 } from '@/lib/data';
+import { YearlyLeaveBalancesWidget } from '@/components/app/yearly-leave-balances-widget';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ArrowRight, ShieldCheck, ClipboardList, UsersRound, Repeat, Users, Building2, BarChart3, Hourglass, Landmark, Lock } from 'lucide-react';
 import Link from 'next/link';
@@ -41,12 +43,24 @@ function ManagementCard({ title, description, href, icon: Icon }: { title: strin
 }
 
 export default async function AdminPage() {
-  const allLeaveRequests = await getAllLeaveRequests();
-  const stats = await getAdminDashboardStats();
-  const departmentReport = await getLeaveReportByDepartment();
-  const employeeReport = await getLeaveReportByEmployee();
-  const allEmployees = await getEmployees();
-  const allLeaveTypes = await getLeaveTypes();
+  const currentYear = new Date().getFullYear();
+  const [
+    allLeaveRequests,
+    stats,
+    departmentReport,
+    employeeReport,
+    allEmployees,
+    allLeaveTypes,
+    yearlyBalances,
+  ] = await Promise.all([
+    getAllLeaveRequests(),
+    getAdminDashboardStats(),
+    getLeaveReportByDepartment(),
+    getLeaveReportByEmployee(),
+    getEmployees(),
+    getLeaveTypes(),
+    getYearlyLeaveBalances({ year: currentYear }),
+  ]);
 
   const pendingRequests = allLeaveRequests.filter(req => req.status === 'Pending');
   const approvedRequests = allLeaveRequests.filter(req => req.status === 'Approved');
@@ -68,6 +82,9 @@ export default async function AdminPage() {
             <StatCard title="Total Roles" value={stats.roleCount} icon={ShieldCheck} />
             <StatCard title="Pending Requests" value={stats.pendingRequestsCount} icon={Hourglass} />
         </div>
+
+        {/* Leave Balances Widget */}
+        <YearlyLeaveBalancesWidget initialData={yearlyBalances} variant="admin" />
 
         <div className="grid gap-6 md:grid-cols-2">
             <Card>

@@ -14,8 +14,10 @@ import {
   getDefaultScreenForUser,
   getLeaveTypes,
   getLeaveBalances,
+  getYearlyLeaveBalances,
   getFallbackUserId,
 } from "@/lib/data";
+import { YearlyLeaveBalancesWidget } from "@/components/app/yearly-leave-balances-widget";
 import { auth, currentUser as getClerkUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -73,10 +75,12 @@ export default async function DashboardPage() {
     await runCarryForwardLogicForUser(userId);
   }
 
-  const [userRequests, leaveTypes, leaveBalances] = await Promise.all([
+  const currentYear = new Date().getFullYear();
+  const [userRequests, leaveTypes, leaveBalances, yearlyBalances] = await Promise.all([
     getLeaveRequestsForCurrentUser(userId),
     getLeaveTypes(),
     getLeaveBalances(userId),
+    getYearlyLeaveBalances({ year: currentYear, employeeId: userId }),
   ]);
 
   const displayName = clerkUser?.firstName || appUser.name || "User";
@@ -99,7 +103,11 @@ export default async function DashboardPage() {
         />
       </div>
 
-      <LeaveBalanceCards />
+      <YearlyLeaveBalancesWidget
+        initialData={yearlyBalances}
+        variant="employee"
+        currentUserId={userId}
+      />
 
       <Card>
         <CardHeader>

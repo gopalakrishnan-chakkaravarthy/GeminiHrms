@@ -1,4 +1,4 @@
-import { getLeaveRequestsForManager, getAppUser, getFallbackUserId, getEmployees, getLeaveTypes } from '@/lib/data';
+import { getLeaveRequestsForManager, getAppUser, getFallbackUserId, getEmployees, getLeaveTypes, getYearlyLeaveBalances } from '@/lib/data';
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -6,6 +6,7 @@ import { LeaveRequestsTable } from '@/components/app/leave-requests-table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Briefcase } from 'lucide-react';
 import { CreateLeaveOnBehalfDialog } from '@/components/app/create-leave-on-behalf-dialog';
+import { YearlyLeaveBalancesWidget } from '@/components/app/yearly-leave-balances-widget';
 
 export default async function ManagerPage() {
     let userId: string | null = null;
@@ -20,9 +21,13 @@ export default async function ManagerPage() {
       userId = await getFallbackUserId();
     }
 
-    const managerRequests = await getLeaveRequestsForManager(userId);
-    const allEmployees = await getEmployees();
-    const allLeaveTypes = await getLeaveTypes();
+    const currentYear = new Date().getFullYear();
+    const [managerRequests, allEmployees, allLeaveTypes, teamBalances] = await Promise.all([
+      getLeaveRequestsForManager(userId),
+      getEmployees(),
+      getLeaveTypes(),
+      getYearlyLeaveBalances({ year: currentYear, managerId: userId }),
+    ]);
 
     return (
         <div className="space-y-6">
@@ -33,6 +38,13 @@ export default async function ManagerPage() {
                 </div>
                 <CreateLeaveOnBehalfDialog employees={allEmployees} leaveTypes={allLeaveTypes} />
             </div>
+
+            {/* Team Available Leave Balances Widget */}
+            <YearlyLeaveBalancesWidget
+              initialData={teamBalances}
+              variant="manager"
+              currentUserId={userId}
+            />
 
             <Card>
                 <CardHeader>

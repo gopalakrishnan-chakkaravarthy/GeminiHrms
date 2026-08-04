@@ -79,7 +79,7 @@ function CreateEmployeeForm({
             <Input
               id="id"
               name="id"
-              placeholder="user_..."
+              placeholder="user_... (optional, auto-generated if blank)"
               className="col-span-3"
             />
             {state.errors?.id && (

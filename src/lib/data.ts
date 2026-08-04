@@ -1120,4 +1120,228 @@ export async function getAllowedRoutesForUser(
   }
 }
 
+export type YearlyLeaveBalanceItem = {
+  leaveTypeId: string;
+  leaveTypeName: string;
+  allocatedDays: number;
+  usedDays: number;
+  pendingDays: number;
+  availableDays: number;
+  icon: string;
+};
+
+export type EmployeeYearlyLeaveBalance = {
+  employeeId: string;
+  employeeName: string;
+  employeeEmail: string;
+  avatarUrl?: string;
+  roleName: string;
+  departmentName: string;
+  managerId: string | null;
+  year: number;
+  balances: YearlyLeaveBalanceItem[];
+  totalAllocated: number;
+  totalUsed: number;
+  totalPending: number;
+  totalAvailable: number;
+};
+
+export async function getYearlyLeaveBalances(options?: {
+  year?: number;
+  employeeId?: string;
+  managerId?: string;
+}): Promise<EmployeeYearlyLeaveBalance[]> {
+  const targetYear = options?.year || new Date().getFullYear();
+  const iconMap: { [key: string]: string } = {
+    Vacation: "Plane",
+    "Sick Leave": "HeartPulse",
+    "Personal Day": "User",
+    Bereavement: "Heart",
+  };
+
+  if (!db) {
+    console.warn("DATABASE NOT CONFIGURED: Using mock data for getYearlyLeaveBalances");
+    let employees = mock.allEmployees;
+    if (options?.employeeId) {
+      employees = employees.filter((e) => e.id === options.employeeId);
+    } else if (options?.managerId) {
+      employees = employees.filter(
+        (e) => e.managerId === options.managerId || e.id === options.managerId
+      );
+    }
+
+    const defaultAllocations: { [key: string]: number } = {
+      "lt-1": 25,
+      "lt-2": 10,
+      "lt-3": 5,
+      "lt-4": 3,
+    };
+
+    const results: EmployeeYearlyLeaveBalance[] = employees.map((emp) => {
+      const balances: YearlyLeaveBalanceItem[] = mock.allLeaveTypes.map((lt) => {
+        const lg = mock.allLeaveGroups.find(
+          (g) => g.roleId === emp.roleId && g.leaveTypeId === lt.id
+        );
+        const allocatedDays = lg ? lg.daysAllowed : defaultAllocations[lt.id] || 20;
+
+        const empRequests = mock.allLeaveRequests.filter((r) => {
+          if (r.employeeId !== emp.id) return false;
+          const reqLeaveType =
+            r.leaveType === "Vacation" ? "lt-1" : r.leaveType === "Sick" ? "lt-2" : "lt-3";
+          if (reqLeaveType !== lt.id && r.leaveType !== lt.name) return false;
+          const reqYear = new Date(r.startDate).getFullYear();
+          return reqYear === targetYear;
+        });
+
+        const usedDays = empRequests
+          .filter((r) => r.status === "Approved")
+          .reduce((acc, r) => acc + r.days, 0);
+
+        const pendingDays = empRequests
+          .filter((r) => r.status === "Pending")
+          .reduce((acc, r) => acc + r.days, 0);
+
+        const availableDays = Math.max(0, allocatedDays - usedDays);
+
+        return {
+          leaveTypeId: lt.id,
+          leaveTypeName: lt.name,
+          allocatedDays,
+          usedDays,
+          pendingDays,
+          availableDays,
+          icon: iconMap[lt.name] || "User",
+        };
+      });
+
+      const totalAllocated = balances.reduce((a, b) => a + b.allocatedDays, 0);
+      const totalUsed = balances.reduce((a, b) => a + b.usedDays, 0);
+      const totalPending = balances.reduce((a, b) => a + b.pendingDays, 0);
+      const totalAvailable = balances.reduce((a, b) => a + b.availableDays, 0);
+
+      return {
+        employeeId: emp.id,
+        employeeName: emp.name,
+        employeeEmail: emp.email,
+        avatarUrl: emp.avatarUrl,
+        roleName: emp.roleName,
+        departmentName: emp.departmentName,
+        managerId: emp.managerId,
+        year: targetYear,
+        balances,
+        totalAllocated,
+        totalUsed,
+        totalPending,
+        totalAvailable,
+      };
+    });
+
+    return toPlain(results);
+  }
+
+  noStore();
+  try {
+    let whereConditions: string[] = [];
+    let queryParams: any[] = [targetYear];
+
+    if (options?.employeeId) {
+      queryParams.push(options.employeeId);
+      whereConditions.push(`e.id = $${queryParams.length}`);
+    } else if (options?.managerId) {
+      queryParams.push(options.managerId);
+      whereConditions.push(`(e.manager_id = $${queryParams.length} OR e.id = $${queryParams.length})`);
+    }
+
+    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")}` : "";
+
+    const query = `
+      SELECT 
+        e.id as "employeeId",
+        e.name as "employeeName",
+        e.email as "employeeEmail",
+        e.avatar_url as "avatarUrl",
+        COALESCE(r.name, 'No Role') as "roleName",
+        COALESCE(d.name, 'No Department') as "departmentName",
+        e.manager_id as "managerId",
+        lt.id as "leaveTypeId",
+        lt.name as "leaveTypeName",
+        COALESCE(lp.days_allowed, 20) as "allocatedDays",
+        COALESCE((
+          SELECT SUM(lr.days) 
+          FROM leave_requests lr 
+          WHERE lr.employee_id = e.id 
+            AND lr.leave_type_id = lt.id 
+            AND lr.status = 'Approved' 
+            AND EXTRACT(YEAR FROM lr.start_date) = $1
+        ), 0) as "usedDays",
+        COALESCE((
+          SELECT SUM(lr.days) 
+          FROM leave_requests lr 
+          WHERE lr.employee_id = e.id 
+            AND lr.leave_type_id = lt.id 
+            AND lr.status = 'Pending' 
+            AND EXTRACT(YEAR FROM lr.start_date) = $1
+        ), 0) as "pendingDays"
+      FROM employees e
+      CROSS JOIN leave_types lt
+      LEFT JOIN roles r ON e.role_id = r.id
+      LEFT JOIN departments d ON e.department_id = d.id
+      LEFT JOIN leave_policies lp ON lp.role_id = e.role_id AND lp.leave_type_id = lt.id
+      ${whereClause}
+      ORDER BY e.name, lt.name
+    `;
+
+    const data = await db.query(query, queryParams);
+
+    const employeeMap = new Map<string, EmployeeYearlyLeaveBalance>();
+
+    for (const row of data.rows) {
+      const empId = row.employeeId;
+      if (!employeeMap.has(empId)) {
+        employeeMap.set(empId, {
+          employeeId: empId,
+          employeeName: row.employeeName,
+          employeeEmail: row.employeeEmail,
+          avatarUrl: row.avatarUrl,
+          roleName: row.roleName,
+          departmentName: row.departmentName,
+          managerId: row.managerId,
+          year: targetYear,
+          balances: [],
+          totalAllocated: 0,
+          totalUsed: 0,
+          totalPending: 0,
+          totalAvailable: 0,
+        });
+      }
+
+      const empRecord = employeeMap.get(empId)!;
+      const allocatedDays = parseFloat(row.allocatedDays || 0);
+      const usedDays = parseFloat(row.usedDays || 0);
+      const pendingDays = parseFloat(row.pendingDays || 0);
+      const availableDays = Math.max(0, allocatedDays - usedDays);
+
+      empRecord.balances.push({
+        leaveTypeId: row.leaveTypeId,
+        leaveTypeName: row.leaveTypeName,
+        allocatedDays,
+        usedDays,
+        pendingDays,
+        availableDays,
+        icon: iconMap[row.leaveTypeName] || "User",
+      });
+
+      empRecord.totalAllocated += allocatedDays;
+      empRecord.totalUsed += usedDays;
+      empRecord.totalPending += pendingDays;
+      empRecord.totalAvailable += availableDays;
+    }
+
+    return toPlain(Array.from(employeeMap.values()));
+  } catch (error) {
+    console.error("Database Error getting yearly leave balances:", error);
+    return [];
+  }
+}
+
 export { db };

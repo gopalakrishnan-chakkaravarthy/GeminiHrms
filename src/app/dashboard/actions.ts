@@ -430,3 +430,13 @@ export async function sendCalendarInviteAction(input: {
     };
   }
 }
+
+export async function getYearlyLeaveBalancesAction(options?: {
+  year?: number;
+  employeeId?: string;
+  managerId?: string;
+}) {
+  const { getYearlyLeaveBalances } = await import("@/lib/data");
+  return getYearlyLeaveBalances(options);
+}
+
