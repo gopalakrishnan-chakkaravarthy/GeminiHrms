@@ -18,7 +18,7 @@ import {
   getFallbackUserId,
 } from "@/lib/data";
 import { YearlyLeaveBalancesWidget } from "@/components/app/yearly-leave-balances-widget";
-import { auth, currentUser as getClerkUser } from "@clerk/nextjs/server";
+import { getAuthenticatedUserId } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -26,16 +26,11 @@ import { runCarryForwardLogicForUser } from "./actions";
 
 export default async function DashboardPage() {
   let userId: string | null = null;
-  let clerkUser: any = null;
 
   try {
-    const authObj = await auth();
-    userId = authObj?.userId || null;
-    if (userId) {
-      clerkUser = await getClerkUser();
-    }
+    userId = await getAuthenticatedUserId();
   } catch {
-    // ignore Clerk error
+    // ignore
   }
 
   if (!userId) {

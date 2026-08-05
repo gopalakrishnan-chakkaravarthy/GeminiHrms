@@ -33,7 +33,13 @@ export function HolidaysTable({ holidays }: HolidaysTableProps) {
     null
   );
   const { toast } = useToast();
-  const { user } = useUser();
+  let userEmail: string | null = null;
+  try {
+    const clerk = useUser();
+    userEmail = clerk?.user?.primaryEmailAddress?.emailAddress || null;
+  } catch {
+    // ignore
+  }
 
   const handleDelete = (holiday: Holiday) => {
     setSelectedHoliday(holiday);
@@ -41,7 +47,7 @@ export function HolidaysTable({ holidays }: HolidaysTableProps) {
   };
 
   const handleAddToCalendar = (holiday: Holiday) => {
-    if (!user || !user.primaryEmailAddress) {
+    if (!userEmail) {
       toast({
         variant: "destructive",
         title: "Error",
@@ -60,7 +66,7 @@ export function HolidaysTable({ holidays }: HolidaysTableProps) {
       });
 
       const result = await sendCalendarInviteAction({
-        recipientEmail: user.primaryEmailAddress!.emailAddress,
+        recipientEmail: userEmail,
         icsContent: icsContent,
         summary: `Holiday: ${holiday.name}`,
       });

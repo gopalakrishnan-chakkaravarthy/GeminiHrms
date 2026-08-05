@@ -1,20 +1,19 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { CalendarCheck, Users, BotMessageSquare } from 'lucide-react';
-import { auth } from '@clerk/nextjs/server';
-import { getAppUser, getFallbackUserId } from '@/lib/data';
+import { CalendarCheck, Users, BotMessageSquare, LogIn } from 'lucide-react';
+import { getAppUser } from '@/lib/data';
+import { getAuthenticatedUserId } from '@/lib/auth';
 import { UserNav } from '@/components/app/user-nav';
 
-export default async function LoginPage() {
-  let clerkUserId: string | null = null;
+export default async function LandingPage() {
+  let authenticatedUserId: string | null = null;
   try {
-    const authObj = await auth();
-    clerkUserId = authObj?.userId || null;
+    authenticatedUserId = await getAuthenticatedUserId();
   } catch {
     // ignore
   }
 
-  const user = clerkUserId ? await getAppUser(clerkUserId) : null;
+  const user = authenticatedUserId ? await getAppUser(authenticatedUserId) : null;
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -23,7 +22,7 @@ export default async function LoginPage() {
           <h1 className="text-2xl font-bold font-headline text-primary">AbsenceAce</h1>
         </Link>
         <div className="flex items-center gap-3">
-          {clerkUserId && user ? (
+          {authenticatedUserId && user ? (
             <>
               <Button asChild variant="outline">
                 <Link href="/dashboard">Dashboard</Link>
@@ -33,10 +32,10 @@ export default async function LoginPage() {
           ) : (
             <>
               <Button variant="ghost" asChild>
-                <Link href="/sign-in">Sign In</Link>
+                <Link href="/login">Sign In</Link>
               </Button>
               <Button asChild>
-                <Link href="/sign-up">Sign Up</Link>
+                <Link href="/login">Get Started</Link>
               </Button>
             </>
           )}
@@ -52,23 +51,25 @@ export default async function LoginPage() {
             Simplify time-off with AbsenceAce. Our AI-powered platform helps you manage requests, track balances, and get insights for optimal team planning.
           </p>
 
-          {clerkUserId ? (
+          {authenticatedUserId ? (
             <Button asChild size="lg" className="font-bold text-lg px-10 py-6 shadow-md">
               <Link href="/dashboard">Go to Your Dashboard</Link>
             </Button>
           ) : (
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Button asChild size="lg" className="font-bold text-lg px-10 py-6 shadow-md w-full sm:w-auto">
-                <Link href="/sign-in">Sign In</Link>
+              <Button asChild size="lg" className="font-bold text-lg px-10 py-6 shadow-md w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white">
+                <Link href="/login">
+                  <LogIn className="w-5 h-5 mr-2" /> Sign In to AbsenceAce
+                </Link>
               </Button>
               <Button asChild size="lg" variant="outline" className="font-semibold text-lg px-8 py-6 w-full sm:w-auto">
-                <Link href="/dashboard">Try Demo Dashboard</Link>
+                <Link href="/dashboard">Explore Demo Dashboard</Link>
               </Button>
             </div>
           )}
         </div>
       </main>
-      <footer className="p-8">
+      <footer className="p-8 border-t">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto text-left">
           <div className="flex items-start gap-4">
             <CalendarCheck className="w-8 h-8 text-primary mt-1" />

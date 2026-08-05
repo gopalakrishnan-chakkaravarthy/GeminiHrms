@@ -138,6 +138,23 @@ function CreateEmployeeForm({
             )}
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="password" className="text-right">
+              Password
+            </Label>
+            <Input
+              id="password"
+              name="password"
+              type="password"
+              placeholder="Default: Password@123"
+              className="col-span-3"
+            />
+            {state.errors?.password && (
+              <p className="col-span-4 text-red-500 text-xs text-right">
+                {state.errors.password[0]}
+              </p>
+            )}
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="roleId" className="text-right">
               Role
             </Label>

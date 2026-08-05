@@ -5,7 +5,7 @@ import { UserNav } from '@/components/app/user-nav';
 import { NotificationBell } from '@/components/app/notification-bell';
 import { Leaf } from 'lucide-react';
 import { getAllowedRoutesForUser, getAppUser, getFallbackUserId, getAllLeaveRequests } from '@/lib/data';
-import { auth } from '@clerk/nextjs/server';
+import { getAuthenticatedUserId } from '@/lib/auth';
 
 export default async function DashboardLayout({
   children,
@@ -14,8 +14,7 @@ export default async function DashboardLayout({
 }) {
   let userId: string | null = null;
   try {
-    const authObj = await auth();
-    userId = authObj?.userId || null;
+    userId = await getAuthenticatedUserId();
   } catch {
     // ignore
   }

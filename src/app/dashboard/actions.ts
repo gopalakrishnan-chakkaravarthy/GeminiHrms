@@ -8,7 +8,7 @@ import {
 import { generateLeaveStatusEmail } from "@/lib/email";
 import { db, getAppUser, getHolidays, getLeaveBalances, getFallbackUserId } from "@/lib/data";
 import { parseLocalDate } from "@/lib/utils";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthenticatedUserId } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import {
@@ -117,8 +117,7 @@ export async function createLeaveRequestAction(
 ): Promise<FormState> {
   let userId: string | null = null;
   try {
-    const authObj = await auth();
-    userId = authObj?.userId || null;
+    userId = await getAuthenticatedUserId();
   } catch {
     // ignore
   }
@@ -261,8 +260,7 @@ export async function withdrawLeaveRequestAction(
 ): Promise<{ success: boolean; message: string }> {
   let userId: string | null = null;
   try {
-    const authObj = await auth();
-    userId = authObj?.userId || null;
+    userId = await getAuthenticatedUserId();
   } catch {
     // ignore
   }

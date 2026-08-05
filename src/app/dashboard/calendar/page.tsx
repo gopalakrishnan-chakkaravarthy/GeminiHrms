@@ -9,14 +9,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getAllLeaveRequests, getHolidays, getAppUser, getFallbackUserId } from "@/lib/data";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthenticatedUserId } from "@/lib/auth";
 
 export default async function CalendarPage() {
   const currentYear = new Date().getFullYear();
   let userId: string | null = null;
   try {
-    const authObj = await auth();
-    userId = authObj?.userId || null;
+    userId = await getAuthenticatedUserId();
   } catch {
     // ignore
   }

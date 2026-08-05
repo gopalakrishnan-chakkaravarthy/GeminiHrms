@@ -1,6 +1,5 @@
 "use client";
 
-import { useClerk } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import {
   Avatar,
@@ -18,19 +17,33 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { User } from "@/lib/data";
-import Link from 'next/link';
 
 type UserNavProps = {
   user: User;
 };
 
 export function UserNav({ user }: UserNavProps) {
-  const { signOut } = useClerk();
   const router = useRouter();
 
   const handleSignOut = async () => {
-    await signOut({ redirectUrl: "/sign-in" });
-    window.location.href = "/sign-in";
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // ignore
+    }
+
+    // Also check Clerk if loaded
+    if (typeof window !== "undefined" && (window as any).Clerk) {
+      try {
+        await (window as any).Clerk.signOut();
+      } catch {
+        // ignore
+      }
+    }
+
+    router.push("/login");
+    router.refresh();
+    window.location.href = "/login";
   };
 
   return (
@@ -39,7 +52,7 @@ export function UserNav({ user }: UserNavProps) {
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
           <Avatar className="h-9 w-9">
             <AvatarImage src={user.avatarUrl} alt={user.name} data-ai-hint={user.dataAiHint} />
-            <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+            <AvatarFallback>{user.name ? user.name.charAt(0) : "U"}</AvatarFallback>
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
@@ -50,16 +63,20 @@ export function UserNav({ user }: UserNavProps) {
             <p className="text-xs leading-none text-muted-foreground">
               {user.email}
             </p>
+            {user.roleName && (
+              <span className="text-[10px] text-emerald-600 font-semibold uppercase tracking-wider">
+                {user.roleName}
+              </span>
+            )}
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem>Profile</DropdownMenuItem>
-          <DropdownMenuItem>Settings</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => router.push("/dashboard")}>Dashboard</DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleSignOut}>
-            Log out
+        <DropdownMenuItem onClick={handleSignOut} className="text-red-600 cursor-pointer">
+          Log out
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

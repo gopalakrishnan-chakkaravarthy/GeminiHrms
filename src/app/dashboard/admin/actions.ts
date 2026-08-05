@@ -9,6 +9,7 @@ import { z } from "zod";
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import nodemailer from "nodemailer";
 import { generateIcsContent } from "@/lib/calendar";
+import { ensurePasswordColumnExists, hashPassword } from "@/lib/auth";
 
 const enableAIFeatures = process.env.NEXT_PUBLIC_ENABLE_AI_FEATURES === "true";
 
@@ -1089,6 +1090,10 @@ export async function createEmployeeAction(
 
   try {
     await client.query("BEGIN");
+    await ensurePasswordColumnExists();
+
+    const rawPassword = (formData.get("password") as string)?.trim() || "Password@123";
+    const hashedPassword = await hashPassword(rawPassword);
 
     // Check if email already exists
     const existingEmail = await client.query(
@@ -1132,8 +1137,8 @@ export async function createEmployeeAction(
     }
 
     await client.query(
-      `INSERT INTO employees (id, name, email, avatar_url, role_id, department_id, manager_id, leave_history, employee_id, phone_number, emergency_contact_number, blood_group) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+      `INSERT INTO employees (id, name, email, avatar_url, role_id, department_id, manager_id, leave_history, employee_id, phone_number, emergency_contact_number, blood_group, password) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
       [
         finalId,
         name,
@@ -1147,6 +1152,7 @@ export async function createEmployeeAction(
         phoneNumber || null,
         emergencyContactNumber || null,
         bloodGroup || null,
+        hashedPassword,
       ],
     );
 

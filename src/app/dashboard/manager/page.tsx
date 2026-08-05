@@ -1,5 +1,5 @@
 import { getLeaveRequestsForManager, getAppUser, getFallbackUserId, getEmployees, getLeaveTypes, getYearlyLeaveBalances } from '@/lib/data';
-import { auth } from '@clerk/nextjs/server';
+import { getAuthenticatedUserId } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { LeaveRequestsTable } from '@/components/app/leave-requests-table';
@@ -11,8 +11,7 @@ import { YearlyLeaveBalancesWidget } from '@/components/app/yearly-leave-balance
 export default async function ManagerPage() {
     let userId: string | null = null;
     try {
-      const authObj = await auth();
-      userId = authObj?.userId || null;
+      userId = await getAuthenticatedUserId();
     } catch {
       // ignore
     }
