@@ -1186,9 +1186,7 @@ export async function getYearlyLeaveBalances(options?: {
 
         const empRequests = mock.allLeaveRequests.filter((r) => {
           if (r.employeeId !== emp.id) return false;
-          const reqLeaveType =
-            r.leaveType === "Vacation" ? "lt-1" : r.leaveType === "Sick" ? "lt-2" : "lt-3";
-          if (reqLeaveType !== lt.id && r.leaveType !== lt.name) return false;
+          if (r.leaveType !== lt.name && (r as any).leaveTypeId !== lt.id) return false;
           const reqYear = new Date(r.startDate).getFullYear();
           return reqYear === targetYear;
         });
@@ -1265,7 +1263,7 @@ export async function getYearlyLeaveBalances(options?: {
         e.manager_id as "managerId",
         lt.id as "leaveTypeId",
         lt.name as "leaveTypeName",
-        COALESCE(lp.days_allowed, 20) as "allocatedDays",
+        COALESCE(lb.balance, lp.days_allowed, 0) as "allocatedDays",
         COALESCE((
           SELECT SUM(lr.days) 
           FROM leave_requests lr 
@@ -1287,6 +1285,7 @@ export async function getYearlyLeaveBalances(options?: {
       LEFT JOIN roles r ON e.role_id = r.id
       LEFT JOIN departments d ON e.department_id = d.id
       LEFT JOIN leave_policies lp ON lp.role_id = e.role_id AND lp.leave_type_id = lt.id
+      LEFT JOIN leave_balances lb ON lb.employee_id = e.id AND lb.leave_type_id = lt.id AND (lb.year = $1 OR lb.year IS NULL)
       ${whereClause}
       ORDER BY e.name, lt.name
     `;

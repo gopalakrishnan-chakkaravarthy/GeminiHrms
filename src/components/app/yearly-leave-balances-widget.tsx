@@ -77,6 +77,18 @@ export function YearlyLeaveBalancesWidget({
     return [currentYear - 2, currentYear - 1, currentYear, currentYear + 1, currentYear + 2];
   }, [currentYear]);
 
+  const allLeaveTypeNames = useMemo(() => {
+    const typeSet = new Set<string>();
+    data.forEach((emp) => {
+      emp.balances.forEach((b) => {
+        if (b.leaveTypeName) {
+          typeSet.add(b.leaveTypeName);
+        }
+      });
+    });
+    return Array.from(typeSet);
+  }, [data]);
+
   const handleYearChange = (yearStr: string) => {
     const yearNum = Number(yearStr);
     setSelectedYear(yearNum);
@@ -486,9 +498,11 @@ export function YearlyLeaveBalancesWidget({
                     <TableRow>
                       <TableHead className="w-[200px]">Employee</TableHead>
                       <TableHead>Department / Role</TableHead>
-                      <TableHead className="text-center">Vacation Left</TableHead>
-                      <TableHead className="text-center">Sick Left</TableHead>
-                      <TableHead className="text-center">Personal Left</TableHead>
+                      {allLeaveTypeNames.map((typeName) => (
+                        <TableHead key={typeName} className="text-center font-semibold">
+                          {typeName} Available
+                        </TableHead>
+                      ))}
                       <TableHead className="text-right font-bold">
                         Total Available ({selectedYear})
                       </TableHead>
@@ -497,16 +511,6 @@ export function YearlyLeaveBalancesWidget({
                   <TableBody>
                     {filteredEmployees.length > 0 ? (
                       filteredEmployees.map((emp) => {
-                        const vacation =
-                          emp.balances.find((b) => b.leaveTypeName === "Vacation") ||
-                          emp.balances[0];
-                        const sick =
-                          emp.balances.find((b) => b.leaveTypeName === "Sick Leave") ||
-                          emp.balances[1];
-                        const personal =
-                          emp.balances.find((b) => b.leaveTypeName === "Personal Day") ||
-                          emp.balances[2];
-
                         return (
                           <TableRow key={emp.employeeId}>
                             <TableCell>
@@ -523,30 +527,19 @@ export function YearlyLeaveBalancesWidget({
                               <div>{emp.departmentName}</div>
                               <div className="text-muted-foreground">{emp.roleName}</div>
                             </TableCell>
-                            <TableCell className="text-center font-mono text-xs">
-                              <span className="font-semibold">
-                                {vacation ? vacation.availableDays : 0}d
-                              </span>{" "}
-                              <span className="text-muted-foreground text-[10px]">
-                                / {vacation ? vacation.allocatedDays : 0}d
-                              </span>
-                            </TableCell>
-                            <TableCell className="text-center font-mono text-xs">
-                              <span className="font-semibold">
-                                {sick ? sick.availableDays : 0}d
-                              </span>{" "}
-                              <span className="text-muted-foreground text-[10px]">
-                                / {sick ? sick.allocatedDays : 0}d
-                              </span>
-                            </TableCell>
-                            <TableCell className="text-center font-mono text-xs">
-                              <span className="font-semibold">
-                                {personal ? personal.availableDays : 0}d
-                              </span>{" "}
-                              <span className="text-muted-foreground text-[10px]">
-                                / {personal ? personal.allocatedDays : 0}d
-                              </span>
-                            </TableCell>
+                            {allLeaveTypeNames.map((typeName) => {
+                              const balanceItem = emp.balances.find((b) => b.leaveTypeName === typeName);
+                              const available = balanceItem ? balanceItem.availableDays : 0;
+                              const allocated = balanceItem ? balanceItem.allocatedDays : 0;
+                              return (
+                                <TableCell key={typeName} className="text-center font-mono text-xs">
+                                  <span className="font-semibold">{available}d</span>{" "}
+                                  <span className="text-muted-foreground text-[10px]">
+                                    / {allocated}d
+                                  </span>
+                                </TableCell>
+                              );
+                            })}
                             <TableCell className="text-right">
                               <Badge
                                 variant="outline"
@@ -565,7 +558,7 @@ export function YearlyLeaveBalancesWidget({
                       })
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={3 + allLeaveTypeNames.length} className="text-center py-8 text-muted-foreground">
                           No employee balances found for the selected filters.
                         </TableCell>
                       </TableRow>
