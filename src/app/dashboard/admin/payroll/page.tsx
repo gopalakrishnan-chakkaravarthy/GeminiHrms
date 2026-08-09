@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowRight, Settings, Component, Receipt, PlayCircle } from 'lucide-react';
+import { ArrowRight, Settings, Component, Receipt, PlayCircle, ShieldAlert, Percent, Landmark } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
@@ -31,15 +31,15 @@ export default function PayrollPage() {
     <div className="space-y-6">
         <div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight font-headline">Payroll Management</h1>
-            <p className="text-muted-foreground">Configure, run, and review your organization's payroll.</p>
+            <p className="text-muted-foreground">Configure, run, and review your organization's payroll & statutory deductions.</p>
         </div>
 
         <Card>
             <CardHeader>
                 <CardTitle>Payroll Sections</CardTitle>
-                <CardDescription>Manage core components of the payroll system.</CardDescription>
+                <CardDescription>Manage core components, employee assignments, statutory compliance, and payroll execution.</CardDescription>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                  <ManagementCard 
                     title="Payroll Components" 
                     description="Define earnings and deductions." 
@@ -51,6 +51,12 @@ export default function PayrollPage() {
                     description="Assign components to employees." 
                     href="/dashboard/admin/payroll/settings"
                     icon={Settings}
+                />
+                <ManagementCard 
+                    title="Statutory Rules (PF, ESI, TDS)" 
+                    description="Configure ESI/ESU, Provident Fund & Tax slabs." 
+                    href="/dashboard/admin/payroll/statutory"
+                    icon={Landmark}
                 />
                  <ManagementCard 
                     title="Run Payroll" 

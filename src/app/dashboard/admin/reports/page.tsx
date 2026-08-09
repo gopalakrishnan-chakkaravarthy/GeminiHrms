@@ -6,17 +6,54 @@ import {
   getLeaveTypes,
   getLeaveReportByDepartment,
   getLeaveReportByEmployee,
+  getAllAttendanceLogs,
+  getDepartments,
 } from "@/lib/data";
 import { ReportsChart } from "@/components/app/reports-chart";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StatCard } from "@/components/app/stat-card";
 import { LeaveRequestsTable } from "@/components/app/leave-requests-table";
-import { Hourglass, CheckCircle2, XCircle, Calendar, BarChart3, Users, Building2 } from "lucide-react";
+import { AttendanceLogTable } from "@/components/app/attendance-log-table";
+import { Hourglass, CheckCircle2, XCircle, Calendar, BarChart3, Users, Building2, MapPin, Clock, ShieldAlert } from "lucide-react";
+import { isReportsEnabled } from "@/lib/feature-flags";
 
 export default async function ReportsPage() {
+  if (!isReportsEnabled()) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight font-headline">
+            Attendance & Leave Reports
+          </h1>
+          <p className="text-muted-foreground">
+            View, audit, and track live attendance punch logs and leave requests across all employees.
+          </p>
+        </div>
+
+        <Card className="border-amber-200 bg-amber-50/50">
+          <CardHeader>
+            <CardTitle className="text-amber-900 flex items-center gap-2">
+              <ShieldAlert className="h-5 w-5 text-amber-600" /> Module Disabled
+            </CardTitle>
+            <CardDescription className="text-amber-800">
+              The Reports module is currently disabled by administrator configuration (NEXT_PUBLIC_ENABLE_REPORTS).
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-amber-700">
+              To enable reports and analytics, set <code className="bg-amber-100 px-1 py-0.5 rounded text-amber-900">NEXT_PUBLIC_ENABLE_REPORTS=true</code> in your environment variables.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   const allLeaveRequests = await getAllLeaveRequests();
   const allEmployees = await getEmployees();
   const allLeaveTypes = await getLeaveTypes();
+  const attendanceLogs = await getAllAttendanceLogs();
+  const departments = await getDepartments();
 
   const weeklyData = await getLeaveReportByPeriod("week");
   const monthlyData = await getLeaveReportByPeriod("month");
@@ -35,15 +72,21 @@ export default async function ReportsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight font-headline">
-          Leave Reports & Export Hub
+          Attendance & Leave Reports
         </h1>
         <p className="text-muted-foreground">
-          View, audit, and export leave records across all employees.
+          View, audit, and track live attendance punch logs and leave requests across all employees.
         </p>
       </div>
 
       {/* SUMMARY STAT CARDS */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          title="Daily Punch Logs"
+          value={attendanceLogs.length}
+          icon={Clock}
+          description="Total employee sign-in/out logs"
+        />
         <StatCard
           title="Pending Requests"
           value={pendingRequests.length}
@@ -57,12 +100,6 @@ export default async function ReportsPage() {
           description="Total leave requests approved"
         />
         <StatCard
-          title="Rejected Requests"
-          value={rejectedRequests.length}
-          icon={XCircle}
-          description="Total leave requests rejected"
-        />
-        <StatCard
           title="Total Leave Days"
           value={totalLeaveDays}
           icon={Calendar}
@@ -70,17 +107,20 @@ export default async function ReportsPage() {
         />
       </div>
 
-      {/* MAIN TABBED LEAVE MANAGEMENT & EXPORT */}
+      {/* MAIN TABBED MANAGEMENT */}
       <Card>
         <CardHeader>
-          <CardTitle>Employee Leave Reports</CardTitle>
+          <CardTitle>Attendance & Leave Records</CardTitle>
           <CardDescription>
-            Filter leave records by status, employee, or leave type and export to Excel or PDF.
+            Audit attendance punch-ins, GPS location distances, live photo verifications, and leave requests.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="all" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 lg:w-[600px]">
+          <Tabs defaultValue="attendance" className="space-y-4">
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 lg:w-[750px]">
+              <TabsTrigger value="attendance" className="gap-1">
+                <Clock className="h-3.5 w-3.5" /> Attendance ({attendanceLogs.length})
+              </TabsTrigger>
               <TabsTrigger value="all">
                 All Leaves ({allLeaveRequests.length})
               </TabsTrigger>
@@ -91,9 +131,14 @@ export default async function ReportsPage() {
                 Approved ({approvedRequests.length})
               </TabsTrigger>
               <TabsTrigger value="analytics">
-                Trends & Analytics
+                Analytics
               </TabsTrigger>
             </TabsList>
+
+            {/* ATTENDANCE TAB */}
+            <TabsContent value="attendance" className="space-y-4">
+              <AttendanceLogTable logs={attendanceLogs} departments={departments} />
+            </TabsContent>
 
             {/* ALL LEAVES TAB */}
             <TabsContent value="all" className="space-y-4">

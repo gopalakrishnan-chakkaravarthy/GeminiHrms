@@ -33,14 +33,16 @@ import {
   Calendar as CalendarIcon,
   CheckCircle2,
   AlertTriangle,
+  Landmark,
+  ShieldCheck,
 } from "lucide-react";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending} size="lg">
+    <Button type="submit" disabled={pending} size="lg" className="bg-emerald-700 hover:bg-emerald-800 text-white font-medium">
       {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-      Run Payroll
+      Run Payroll & Apply Statutory Rules
     </Button>
   );
 }
@@ -123,7 +125,7 @@ export function RunPayrollForm({ employees }: { employees: Employee[] }) {
             Define the start and end date for this payroll run.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <Popover>
             <PopoverTrigger asChild>
               <Button
@@ -159,6 +161,16 @@ export function RunPayrollForm({ employees }: { employees: Employee[] }) {
               />
             </PopoverContent>
           </Popover>
+
+          <div className="bg-emerald-50 border border-emerald-200/80 rounded-lg p-3.5 flex items-start gap-3 text-xs text-emerald-950">
+            <ShieldCheck className="h-5 w-5 text-emerald-700 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-emerald-900">Automatic Statutory Deductions Active</p>
+              <p className="text-emerald-800/90 mt-0.5">
+                Provident Fund (PF @ 12%), Employee State Insurance (ESI/ESU @ 0.75%), and Tax Deducted at Source (TDS) will be auto-calculated according to configured statutory rules and appended to each generated payslip.
+              </p>
+            </div>
+          </div>
         </CardContent>
         <CardFooter className="flex flex-col items-start gap-4">
           <SubmitButton />

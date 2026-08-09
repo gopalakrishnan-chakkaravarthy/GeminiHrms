@@ -198,15 +198,27 @@ export function PayslipView({ payslip }: PayslipViewProps) {
               {deductions.length === 0 ? (
                 <p className="text-xs text-slate-400 py-2 italic text-center">No deductions applied</p>
               ) : (
-                deductions.map((item, idx) => (
-                  <div
-                    key={`${item.name}-${idx}`}
-                    className="flex justify-between items-center py-2 text-xs"
-                  >
-                    <span className="font-medium text-slate-700">{item.name}</span>
-                    <span className="font-mono font-medium text-rose-700">-${item.value.toFixed(2)}</span>
-                  </div>
-                ))
+                deductions.map((item, idx) => {
+                  const nameLower = item.name.toLowerCase();
+                  const isStatutory = nameLower.includes("pf") || nameLower.includes("provident") || nameLower.includes("esi") || nameLower.includes("esu") || nameLower.includes("tds") || nameLower.includes("tax");
+
+                  return (
+                    <div
+                      key={`${item.name}-${idx}`}
+                      className="flex justify-between items-center py-2 text-xs"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-medium text-slate-700">{item.name}</span>
+                        {isStatutory && (
+                          <span className="text-[9px] uppercase font-bold bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.2 rounded print:border-amber-300">
+                            Statutory
+                          </span>
+                        )}
+                      </div>
+                      <span className="font-mono font-medium text-rose-700">-${item.value.toFixed(2)}</span>
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>

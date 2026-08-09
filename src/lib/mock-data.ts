@@ -23,6 +23,29 @@ export type Role = {
 export type Department = {
   id: string;
   name: string;
+  signInTime?: string;
+  graceTimeMinutes?: number;
+  businessAddress?: string;
+  businessLatitude?: number;
+  businessLongitude?: number;
+  allowedRadiusMeters?: number;
+};
+
+export type AttendanceLog = {
+  id: string;
+  employeeId: string;
+  employeeName?: string;
+  employeeEmail?: string;
+  departmentName?: string;
+  date: string;
+  punchInTime: string | null;
+  punchOutTime: string | null;
+  punchInLat: number | null;
+  punchInLng: number | null;
+  punchInPhoto: string | null;
+  distanceMeters: number | null;
+  status: 'PUNCHED_IN' | 'PUNCHED_OUT' | 'LATE_PUNCH_IN' | 'DAY_OFF' | 'ABSENT';
+  createdAt?: string;
 };
 
 export type Employee = {
@@ -98,10 +121,161 @@ export const allRoles: Role[] = [
 ];
 
 export const allDepartments: Department[] = [
-  { id: "dept-1", name: "Engineering" },
-  { id: "dept-2", name: "Product" },
-  { id: "dept-3", name: "Design" },
-  { id: "dept-4", name: "Human Resources" },
+  {
+    id: "dept-1",
+    name: "Engineering",
+    signInTime: "09:00",
+    graceTimeMinutes: 15,
+    businessAddress: "100 Tech Park Way, San Francisco, CA 94105",
+    businessLatitude: 37.7749,
+    businessLongitude: -122.4194,
+    allowedRadiusMeters: 500,
+  },
+  {
+    id: "dept-2",
+    name: "Product",
+    signInTime: "09:30",
+    graceTimeMinutes: 20,
+    businessAddress: "200 Silicon Avenue, San Jose, CA 95113",
+    businessLatitude: 37.3382,
+    businessLongitude: -121.8863,
+    allowedRadiusMeters: 500,
+  },
+  {
+    id: "dept-3",
+    name: "Design",
+    signInTime: "09:00",
+    graceTimeMinutes: 15,
+    businessAddress: "300 Creative Studio Blvd, Los Angeles, CA 90012",
+    businessLatitude: 34.0522,
+    businessLongitude: -118.2437,
+    allowedRadiusMeters: 500,
+  },
+  {
+    id: "dept-4",
+    name: "Human Resources",
+    signInTime: "08:30",
+    graceTimeMinutes: 15,
+    businessAddress: "400 Corporate Plaza, San Francisco, CA 94105",
+    businessLatitude: 37.7749,
+    businessLongitude: -122.4194,
+    allowedRadiusMeters: 500,
+  },
+];
+
+export const allAttendanceLogs: AttendanceLog[] = [
+  {
+    id: "att-1",
+    employeeId: "user-1",
+    employeeName: "Alice Johnson",
+    employeeEmail: "alice@example.com",
+    departmentName: "Engineering",
+    date: new Date().toISOString().split("T")[0],
+    punchInTime: new Date(new Date().setHours(8, 15, 0, 0)).toISOString(),
+    punchOutTime: new Date(new Date().setHours(17, 30, 0, 0)).toISOString(),
+    punchInLat: 37.7750,
+    punchInLng: -122.4190,
+    punchInPhoto: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'><rect width='200' height='200' fill='%2310b981'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='white' font-size='20' font-family='sans-serif'>Alice Verified</text></svg>",
+    distanceMeters: 42,
+    status: "PUNCHED_OUT",
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "att-2",
+    employeeId: "user-2",
+    employeeName: "Bob Smith",
+    employeeEmail: "bob@example.com",
+    departmentName: "Product",
+    date: new Date().toISOString().split("T")[0],
+    punchInTime: new Date(new Date().setHours(9, 45, 0, 0)).toISOString(),
+    punchOutTime: new Date(new Date().setHours(20, 15, 0, 0)).toISOString(),
+    punchInLat: 37.3385,
+    punchInLng: -121.8860,
+    punchInPhoto: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'><rect width='200' height='200' fill='%233b82f6'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='white' font-size='20' font-family='sans-serif'>Bob Verified</text></svg>",
+    distanceMeters: 65,
+    status: "LATE_PUNCH_IN",
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "att-3",
+    employeeId: "user-3",
+    employeeName: "Carol Danvers",
+    employeeEmail: "carol@example.com",
+    departmentName: "Design",
+    date: new Date(Date.now() - 86400000 * 1).toISOString().split("T")[0], // Yesterday
+    punchInTime: new Date(new Date(Date.now() - 86400000 * 1).setHours(8, 0, 0, 0)).toISOString(),
+    punchOutTime: new Date(new Date(Date.now() - 86400000 * 1).setHours(21, 10, 0, 0)).toISOString(),
+    punchInLat: 34.0525,
+    punchInLng: -118.2430,
+    punchInPhoto: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'><rect width='200' height='200' fill='%238b5cf6'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='white' font-size='20' font-family='sans-serif'>Carol Verified</text></svg>",
+    distanceMeters: 18,
+    status: "PUNCHED_OUT",
+    createdAt: new Date(Date.now() - 86400000 * 1).toISOString(),
+  },
+  {
+    id: "att-4",
+    employeeId: "user-4",
+    employeeName: "David Lee",
+    employeeEmail: "david@example.com",
+    departmentName: "Human Resources",
+    date: new Date(Date.now() - 86400000 * 2).toISOString().split("T")[0],
+    punchInTime: new Date(new Date(Date.now() - 86400000 * 2).setHours(9, 25, 0, 0)).toISOString(),
+    punchOutTime: new Date(new Date(Date.now() - 86400000 * 2).setHours(17, 0, 0, 0)).toISOString(),
+    punchInLat: 37.7752,
+    punchInLng: -122.4192,
+    punchInPhoto: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'><rect width='200' height='200' fill='%23f59e0b'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='white' font-size='20' font-family='sans-serif'>David Verified</text></svg>",
+    distanceMeters: 30,
+    status: "LATE_PUNCH_IN",
+    createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+  },
+  {
+    id: "att-5",
+    employeeId: "user-1",
+    employeeName: "Alice Johnson",
+    employeeEmail: "alice@example.com",
+    departmentName: "Engineering",
+    date: new Date(Date.now() - 86400000 * 3).toISOString().split("T")[0],
+    punchInTime: new Date(new Date(Date.now() - 86400000 * 3).setHours(8, 5, 0, 0)).toISOString(),
+    punchOutTime: new Date(new Date(Date.now() - 86400000 * 3).setHours(19, 45, 0, 0)).toISOString(),
+    punchInLat: 37.7749,
+    punchInLng: -122.4194,
+    punchInPhoto: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'><rect width='200' height='200' fill='%2310b981'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='white' font-size='20' font-family='sans-serif'>Alice Verified</text></svg>",
+    distanceMeters: 10,
+    status: "PUNCHED_OUT",
+    createdAt: new Date(Date.now() - 86400000 * 3).toISOString(),
+  },
+  {
+    id: "att-6",
+    employeeId: "user-5",
+    employeeName: "Emma Watson",
+    employeeEmail: "emma@example.com",
+    departmentName: "Engineering",
+    date: new Date(Date.now() - 86400000 * 5).toISOString().split("T")[0],
+    punchInTime: new Date(new Date(Date.now() - 86400000 * 5).setHours(7, 50, 0, 0)).toISOString(),
+    punchOutTime: new Date(new Date(Date.now() - 86400000 * 5).setHours(17, 0, 0, 0)).toISOString(),
+    punchInLat: 37.7748,
+    punchInLng: -122.4195,
+    punchInPhoto: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'><rect width='200' height='200' fill='%23ec4899'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='white' font-size='20' font-family='sans-serif'>Emma Verified</text></svg>",
+    distanceMeters: 12,
+    status: "PUNCHED_OUT",
+    createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
+  },
+  {
+    id: "att-7",
+    employeeId: "user-2",
+    employeeName: "Bob Smith",
+    employeeEmail: "bob@example.com",
+    departmentName: "Product",
+    date: new Date(Date.now() - 86400000 * 6).toISOString().split("T")[0],
+    punchInTime: new Date(new Date(Date.now() - 86400000 * 6).setHours(9, 35, 0, 0)).toISOString(),
+    punchOutTime: new Date(new Date(Date.now() - 86400000 * 6).setHours(21, 45, 0, 0)).toISOString(),
+    punchInLat: 37.3382,
+    punchInLng: -121.8863,
+    punchInPhoto: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'><rect width='200' height='200' fill='%233b82f6'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='white' font-size='20' font-family='sans-serif'>Bob Verified</text></svg>",
+    distanceMeters: 5,
+    status: "PUNCHED_OUT",
+    createdAt: new Date(Date.now() - 86400000 * 6).toISOString(),
+  },
 ];
 
 export const allLeaveTypes: LeaveType[] = [
@@ -370,19 +544,37 @@ export const allPayrollComponents: PayrollComponent[] = [
     id: "pc-1",
     name: "Basic Salary",
     type: "Earning",
-    description: "The base salary.",
+    description: "The base salary component.",
   },
   {
     id: "pc-2",
     name: "Housing Allowance",
     type: "Earning",
-    description: "Allowance for housing.",
+    description: "Allowance for housing (HRA).",
+  },
+  {
+    id: "pc-pf",
+    name: "Provident Fund (PF)",
+    type: "Deduction",
+    description: "Statutory 12% PF contribution on Basic Salary.",
+  },
+  {
+    id: "pc-esi",
+    name: "Employee State Insurance (ESI/ESU)",
+    type: "Deduction",
+    description: "Statutory 0.75% ESI/ESU contribution on Gross Salary.",
+  },
+  {
+    id: "pc-tds",
+    name: "Tax Deducted at Source (TDS)",
+    type: "Deduction",
+    description: "Statutory TDS withheld according to income tax slabs.",
   },
   {
     id: "pc-3",
     name: "Income Tax",
     type: "Deduction",
-    description: "Statutory tax.",
+    description: "Statutory tax withholding.",
   },
   {
     id: "pc-4",

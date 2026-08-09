@@ -438,3 +438,64 @@ export async function getYearlyLeaveBalancesAction(options?: {
   return getYearlyLeaveBalances(options);
 }
 
+export async function recordPunchInAction(input: {
+  lat: number;
+  lng: number;
+  photo: string;
+  distanceMeters: number;
+}): Promise<{ success: boolean; message: string }> {
+  try {
+    let userId = await getAuthenticatedUserId();
+    if (!userId) {
+      userId = await getFallbackUserId();
+    }
+    if (!userId) {
+      return { success: false, message: "User is not authenticated." };
+    }
+
+    const { savePunchInRecord } = await import("@/lib/data");
+    await savePunchInRecord({
+      employeeId: userId,
+      lat: input.lat,
+      lng: input.lng,
+      photo: input.photo,
+      distanceMeters: input.distanceMeters,
+    });
+
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/admin/reports");
+    return { success: true, message: "Punched in successfully!" };
+  } catch (error) {
+    console.error("Error in recordPunchInAction:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to record punch in.",
+    };
+  }
+}
+
+export async function recordPunchOutAction(): Promise<{ success: boolean; message: string }> {
+  try {
+    let userId = await getAuthenticatedUserId();
+    if (!userId) {
+      userId = await getFallbackUserId();
+    }
+    if (!userId) {
+      return { success: false, message: "User is not authenticated." };
+    }
+
+    const { savePunchOutRecord } = await import("@/lib/data");
+    await savePunchOutRecord(userId);
+
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/admin/reports");
+    return { success: true, message: "Punched out successfully!" };
+  } catch (error) {
+    console.error("Error in recordPunchOutAction:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to record punch out.",
+    };
+  }
+}
+

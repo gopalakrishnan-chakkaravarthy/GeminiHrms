@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { generateLeaveStatusEmail } from "@/lib/email";
-import { runPayrollForEmployees, db, getAppUser, getFallbackUserId } from "@/lib/data";
+import { runPayrollForEmployees, updateStatutorySettings, db, getAppUser, getFallbackUserId } from "@/lib/data";
 import { formatLocalDate, parseLocalDate } from "@/lib/utils";
 import { format, parseISO, differenceInDays } from "date-fns";
 import { z } from "zod";
@@ -646,14 +646,27 @@ export async function deleteRoleAction(id: string): Promise<DeleteResult> {
 
 // --- DEPARTMENT ACTIONS ---
 const DepartmentSchema = z.object({
-  name: z.string().min(3, "Department name must be at least 3 characters."),
+  name: z.string().min(2, "Department name must be at least 2 characters."),
+  signInTime: z.string().optional().default("09:00"),
+  graceTimeMinutes: z.coerce.number().optional().default(15),
+  businessAddress: z.string().optional().default("100 Tech Park Way, San Francisco, CA 94105"),
+  businessLatitude: z.coerce.number().optional().default(37.7749),
+  businessLongitude: z.coerce.number().optional().default(-122.4194),
+  allowedRadiusMeters: z.coerce.number().optional().default(500),
 });
+
 export async function createDepartmentAction(
   prevState: FormState,
   formData: FormData,
 ): Promise<FormState> {
   const validatedFields = DepartmentSchema.safeParse({
     name: formData.get("name"),
+    signInTime: formData.get("signInTime") || "09:00",
+    graceTimeMinutes: formData.get("graceTimeMinutes") || 15,
+    businessAddress: formData.get("businessAddress") || "100 Tech Park Way, San Francisco, CA 94105",
+    businessLatitude: formData.get("businessLatitude") || 37.7749,
+    businessLongitude: formData.get("businessLongitude") || -122.4194,
+    allowedRadiusMeters: formData.get("allowedRadiusMeters") || 500,
   });
 
   if (!validatedFields.success) {
@@ -664,29 +677,55 @@ export async function createDepartmentAction(
     };
   }
 
+  const { ensureAttendanceTablesExist } = await import("@/lib/data");
+  await ensureAttendanceTablesExist();
+
+  const { name, signInTime, graceTimeMinutes, businessAddress, businessLatitude, businessLongitude, allowedRadiusMeters } = validatedFields.data;
+
   try {
-    if (!db) throw new Error("Database not configured");
-    await db.query("INSERT INTO departments (name) VALUES ($1)", [
-      validatedFields.data.name,
-    ]);
+    if (!db) {
+      const newDept = {
+        id: `dept-${Date.now()}`,
+        name,
+        signInTime,
+        graceTimeMinutes,
+        businessAddress,
+        businessLatitude,
+        businessLongitude,
+        allowedRadiusMeters,
+      };
+      const { allDepartments } = await import("@/lib/mock-data");
+      allDepartments.push(newDept);
+      revalidatePath("/dashboard/admin/departments");
+      return {
+        success: true,
+        message: `Created department "${name}".`,
+      };
+    }
+
+    await db.query(
+      `INSERT INTO departments (name, sign_in_time, grace_time_minutes, business_address, business_latitude, business_longitude, allowed_radius_meters)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [name, signInTime, graceTimeMinutes, businessAddress, businessLatitude, businessLongitude, allowedRadiusMeters]
+    );
     revalidatePath("/dashboard/admin/departments");
     return {
       success: true,
-      message: `Created department "${validatedFields.data.name}".`,
+      message: `Created department "${name}".`,
     };
   } catch (error) {
     console.error("Database Error:", error);
     return {
       success: false,
-      message:
-        "Database Error: Failed to create department. Does it already exist?",
+      message: "Database Error: Failed to create department. Does it already exist?",
     };
   }
 }
 
 const UpdateDepartmentSchema = DepartmentSchema.extend({
-  id: z.string().uuid(),
+  id: z.string(),
 });
+
 export async function updateDepartmentAction(
   prevState: FormState,
   formData: FormData,
@@ -694,7 +733,14 @@ export async function updateDepartmentAction(
   const validatedFields = UpdateDepartmentSchema.safeParse({
     id: formData.get("id"),
     name: formData.get("name"),
+    signInTime: formData.get("signInTime") || "09:00",
+    graceTimeMinutes: formData.get("graceTimeMinutes") || 15,
+    businessAddress: formData.get("businessAddress") || "100 Tech Park Way, San Francisco, CA 94105",
+    businessLatitude: formData.get("businessLatitude") || 37.7749,
+    businessLongitude: formData.get("businessLongitude") || -122.4194,
+    allowedRadiusMeters: formData.get("allowedRadiusMeters") || 500,
   });
+
   if (!validatedFields.success) {
     return {
       success: false,
@@ -702,12 +748,35 @@ export async function updateDepartmentAction(
       errors: validatedFields.error.flatten().fieldErrors,
     };
   }
+
+  const { ensureAttendanceTablesExist } = await import("@/lib/data");
+  await ensureAttendanceTablesExist();
+
+  const { id, name, signInTime, graceTimeMinutes, businessAddress, businessLatitude, businessLongitude, allowedRadiusMeters } = validatedFields.data;
+
   try {
-    if (!db) throw new Error("Database not configured");
-    await db.query("UPDATE departments SET name = $1 WHERE id = $2", [
-      validatedFields.data.name,
-      validatedFields.data.id,
-    ]);
+    if (!db) {
+      const { allDepartments } = await import("@/lib/mock-data");
+      const dept = allDepartments.find((d) => d.id === id);
+      if (dept) {
+        dept.name = name;
+        dept.signInTime = signInTime;
+        dept.graceTimeMinutes = graceTimeMinutes;
+        dept.businessAddress = businessAddress;
+        dept.businessLatitude = businessLatitude;
+        dept.businessLongitude = businessLongitude;
+        dept.allowedRadiusMeters = allowedRadiusMeters;
+      }
+      revalidatePath("/dashboard/admin/departments");
+      return { success: true, message: "Department updated successfully." };
+    }
+
+    await db.query(
+      `UPDATE departments 
+       SET name = $1, sign_in_time = $2, grace_time_minutes = $3, business_address = $4, business_latitude = $5, business_longitude = $6, allowed_radius_meters = $7
+       WHERE id = $8`,
+      [name, signInTime, graceTimeMinutes, businessAddress, businessLatitude, businessLongitude, allowedRadiusMeters, id]
+    );
     revalidatePath("/dashboard/admin/departments");
     return { success: true, message: "Department updated successfully." };
   } catch (error) {
@@ -1792,3 +1861,77 @@ export async function addEventToGoogleCalendarAction(
     return { success: false, message: `Error: ${errorMessage}` };
   }
 }
+
+export async function updateStatutorySettingsAction(
+  prevState: FormState,
+  formData: FormData
+): Promise<FormState> {
+  try {
+    const pfEnabled = formData.get("pfEnabled") === "on" || formData.get("pfEnabled") === "true";
+    const employeePfRate = parseFloat(formData.get("employeePfRate") as string) || 0;
+    const employerPfRate = parseFloat(formData.get("employerPfRate") as string) || 0;
+    const pfBasicWageCap = parseFloat(formData.get("pfBasicWageCap") as string) || 0;
+    const calculateOnFullBasic = formData.get("calculateOnFullBasic") === "on" || formData.get("calculateOnFullBasic") === "true";
+
+    const esiEnabled = formData.get("esiEnabled") === "on" || formData.get("esiEnabled") === "true";
+    const employeeEsiRate = parseFloat(formData.get("employeeEsiRate") as string) || 0;
+    const employerEsiRate = parseFloat(formData.get("employerEsiRate") as string) || 0;
+    const esiGrossThreshold = parseFloat(formData.get("esiGrossThreshold") as string) || 0;
+
+    const tdsEnabled = formData.get("tdsEnabled") === "on" || formData.get("tdsEnabled") === "true";
+    const tdsMode = (formData.get("tdsMode") as "SLAB" | "FLAT") || "SLAB";
+    const flatTdsRate = parseFloat(formData.get("flatTdsRate") as string) || 0;
+    const standardDeductionAnnual = parseFloat(formData.get("standardDeductionAnnual") as string) || 0;
+
+    const rawSlabs = formData.get("taxSlabsJson") as string;
+    let taxSlabs = [
+      { id: "slab-1", minIncome: 0, maxIncome: 300000, ratePercent: 0 },
+      { id: "slab-2", minIncome: 300000, maxIncome: 600000, ratePercent: 5 },
+      { id: "slab-3", minIncome: 600000, maxIncome: 900000, ratePercent: 10 },
+      { id: "slab-4", minIncome: 900000, maxIncome: 1200000, ratePercent: 15 },
+      { id: "slab-5", minIncome: 1200000, maxIncome: null, ratePercent: 20 },
+    ];
+
+    if (rawSlabs) {
+      try {
+        taxSlabs = JSON.parse(rawSlabs);
+      } catch (e) {
+        console.error("Error parsing tax slabs JSON:", e);
+      }
+    }
+
+    const rules = {
+      pfEnabled,
+      employeePfRate,
+      employerPfRate,
+      pfBasicWageCap,
+      calculateOnFullBasic,
+      esiEnabled,
+      employeeEsiRate,
+      employerEsiRate,
+      esiGrossThreshold,
+      tdsEnabled,
+      tdsMode,
+      flatTdsRate,
+      standardDeductionAnnual,
+      taxSlabs,
+    };
+
+    await updateStatutorySettings(rules);
+    revalidatePath("/dashboard/admin/payroll/statutory");
+    revalidatePath("/dashboard/admin/payroll/run");
+    revalidatePath("/dashboard/admin/payroll");
+
+    return {
+      success: true,
+      message: "Statutory rules (PF, ESI/ESU, and TDS) successfully updated!",
+    };
+  } catch (err: any) {
+    console.error("Error updating statutory settings action:", err);
+    return {
+      success: false,
+      message: err.message || "Failed to update statutory rules.",
+    };
+  }
+}
+

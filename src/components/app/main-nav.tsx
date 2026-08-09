@@ -23,6 +23,7 @@ import {
   Calendar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { isReportsEnabled } from "@/lib/feature-flags";
 
 export function MainNav({ allowedRoutes }: { allowedRoutes: string[] }) {
   const pathname = usePathname();
@@ -52,6 +53,8 @@ export function MainNav({ allowedRoutes }: { allowedRoutes: string[] }) {
     },
   ];
 
+  const showReports = isReportsEnabled();
+
   const adminMenuItems = [
     {
       href: "/dashboard/admin/employees",
@@ -68,11 +71,15 @@ export function MainNav({ allowedRoutes }: { allowedRoutes: string[] }) {
       label: "Roles",
       icon: ShieldCheck,
     },
-    {
-      href: "/dashboard/admin/reports",
-      label: "Reports",
-      icon: BarChart3,
-    },
+    ...(showReports
+      ? [
+          {
+            href: "/dashboard/admin/reports",
+            label: "Reports",
+            icon: BarChart3,
+          },
+        ]
+      : []),
   ];
 
   const leaveManagementItems = [

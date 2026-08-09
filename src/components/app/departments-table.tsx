@@ -86,7 +86,7 @@ function EditDepartmentForm({
   return (
     <form action={dispatch}>
       <input type="hidden" name="id" value={department.id} />
-      <div className="grid gap-4 py-4">
+      <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto px-1">
         <div className="grid grid-cols-4 items-center gap-4">
           <Label htmlFor="name" className="text-right">
             Name
@@ -97,15 +97,89 @@ function EditDepartmentForm({
             defaultValue={department.name}
             className="col-span-3"
           />
-          {state.errors?.name && (
-            <p className="col-span-4 text-red-500 text-xs text-right">
-              {state.errors.name[0]}
-            </p>
-          )}
+        </div>
+
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="signInTime" className="text-right">
+            Sign-In Time
+          </Label>
+          <Input
+            id="signInTime"
+            name="signInTime"
+            type="time"
+            defaultValue={department.signInTime || "09:00"}
+            className="col-span-3"
+          />
+        </div>
+
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="graceTimeMinutes" className="text-right">
+            Grace (Mins)
+          </Label>
+          <Input
+            id="graceTimeMinutes"
+            name="graceTimeMinutes"
+            type="number"
+            defaultValue={department.graceTimeMinutes ?? 15}
+            className="col-span-3"
+          />
+        </div>
+
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="businessAddress" className="text-right">
+            Address
+          </Label>
+          <Input
+            id="businessAddress"
+            name="businessAddress"
+            defaultValue={department.businessAddress || "100 Tech Park Way, San Francisco, CA"}
+            className="col-span-3"
+          />
+        </div>
+
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="businessLatitude" className="text-right">
+            Latitude
+          </Label>
+          <Input
+            id="businessLatitude"
+            name="businessLatitude"
+            type="number"
+            step="any"
+            defaultValue={department.businessLatitude ?? 37.7749}
+            className="col-span-3"
+          />
+        </div>
+
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="businessLongitude" className="text-right">
+            Longitude
+          </Label>
+          <Input
+            id="businessLongitude"
+            name="businessLongitude"
+            type="number"
+            step="any"
+            defaultValue={department.businessLongitude ?? -122.4194}
+            className="col-span-3"
+          />
+        </div>
+
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="allowedRadiusMeters" className="text-right">
+            Radius (Meters)
+          </Label>
+          <Input
+            id="allowedRadiusMeters"
+            name="allowedRadiusMeters"
+            type="number"
+            defaultValue={department.allowedRadiusMeters ?? 500}
+            className="col-span-3"
+          />
         </div>
       </div>
-      <DialogFooter>
-        <Button variant="ghost" onClick={onClose}>
+      <DialogFooter className="mt-4">
+        <Button variant="ghost" onClick={onClose} type="button">
           Cancel
         </Button>
         <EditSubmitButton />
@@ -188,6 +262,10 @@ export function DepartmentsTable({ departments }: DepartmentsTableProps) {
         <TableHeader>
           <TableRow>
             <TableHead>Department Name</TableHead>
+            <TableHead>Sign-In Time</TableHead>
+            <TableHead>Grace Period</TableHead>
+            <TableHead>Office Address</TableHead>
+            <TableHead>Radius</TableHead>
             <TableHead className="text-right w-[100px]">Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -195,6 +273,12 @@ export function DepartmentsTable({ departments }: DepartmentsTableProps) {
           {departments.map((dept) => (
             <TableRow key={dept.id}>
               <TableCell className="font-medium">{dept.name}</TableCell>
+              <TableCell className="font-mono text-sm">{dept.signInTime || "09:00"}</TableCell>
+              <TableCell>{dept.graceTimeMinutes ?? 15} mins</TableCell>
+              <TableCell className="max-w-[200px] truncate text-muted-foreground text-xs" title={dept.businessAddress}>
+                {dept.businessAddress || "100 Tech Park Way, San Francisco, CA"}
+              </TableCell>
+              <TableCell className="text-xs font-semibold">{dept.allowedRadiusMeters ?? 500}m</TableCell>
               <TableCell className="text-right">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -272,25 +356,100 @@ function CreateDepartmentForm({ onClose }: { onClose: () => void }) {
 
   return (
     <form action={dispatch}>
-      <div className="grid gap-4 py-4">
+      <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto px-1">
         <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="name" className="text-right">
+          <Label htmlFor="create-name" className="text-right">
             Name
           </Label>
           <Input
-            id="name"
+            id="create-name"
             name="name"
             placeholder="e.g. Engineering"
             className="col-span-3"
+            required
           />
         </div>
-        {state.errors?.name && (
-          <p className="col-span-4 text-red-500 text-xs text-right">
-            {state.errors.name[0]}
-          </p>
-        )}
+
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="create-signInTime" className="text-right">
+            Sign-In Time
+          </Label>
+          <Input
+            id="create-signInTime"
+            name="signInTime"
+            type="time"
+            defaultValue="09:00"
+            className="col-span-3"
+          />
+        </div>
+
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="create-graceTimeMinutes" className="text-right">
+            Grace (Mins)
+          </Label>
+          <Input
+            id="create-graceTimeMinutes"
+            name="graceTimeMinutes"
+            type="number"
+            defaultValue={15}
+            className="col-span-3"
+          />
+        </div>
+
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="create-businessAddress" className="text-right">
+            Address
+          </Label>
+          <Input
+            id="create-businessAddress"
+            name="businessAddress"
+            defaultValue="100 Tech Park Way, San Francisco, CA 94105"
+            className="col-span-3"
+          />
+        </div>
+
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="create-businessLatitude" className="text-right">
+            Latitude
+          </Label>
+          <Input
+            id="create-businessLatitude"
+            name="businessLatitude"
+            type="number"
+            step="any"
+            defaultValue={37.7749}
+            className="col-span-3"
+          />
+        </div>
+
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="create-businessLongitude" className="text-right">
+            Longitude
+          </Label>
+          <Input
+            id="create-businessLongitude"
+            name="businessLongitude"
+            type="number"
+            step="any"
+            defaultValue={-122.4194}
+            className="col-span-3"
+          />
+        </div>
+
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="create-allowedRadiusMeters" className="text-right">
+            Radius (Meters)
+          </Label>
+          <Input
+            id="create-allowedRadiusMeters"
+            name="allowedRadiusMeters"
+            type="number"
+            defaultValue={500}
+            className="col-span-3"
+          />
+        </div>
       </div>
-      <DialogFooter>
+      <DialogFooter className="mt-4">
         <CreateSubmitButton />
       </DialogFooter>
     </form>

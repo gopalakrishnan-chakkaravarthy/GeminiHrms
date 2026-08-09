@@ -2,6 +2,12 @@ import { db } from "./db";
 import { unstable_noStore as noStore } from "next/cache";
 import * as mock from "./mock-data";
 import { format } from "date-fns";
+import {
+  DEFAULT_STATUTORY_RULES,
+  calculateStatutoryBreakdown,
+  type StatutoryRules,
+  type StatutoryCalculationResult,
+} from "./statutory";
 
 // --- CONSTANTS ---
 export const APP_ROUTES = [
@@ -19,6 +25,7 @@ export const APP_ROUTES = [
   { path: "/dashboard/admin/payroll", label: "Payroll" },
   { path: "/dashboard/admin/payroll/components", label: "Payroll Components" },
   { path: "/dashboard/admin/payroll/settings", label: "Payroll Settings" },
+  { path: "/dashboard/admin/payroll/statutory", label: "Statutory Rules (PF, ESI, TDS)" },
   { path: "/dashboard/admin/payroll/run", label: "Run Payroll" },
   { path: "/dashboard/admin/payroll/payslips", label: "Payslips" },
   { path: "/dashboard/admin/permissions", label: "Screen Permissions" },
@@ -37,7 +44,15 @@ export type Role = {
 export type Department = {
   id: string;
   name: string;
+  signInTime?: string;
+  graceTimeMinutes?: number;
+  businessAddress?: string;
+  businessLatitude?: number;
+  businessLongitude?: number;
+  allowedRadiusMeters?: number;
 };
+
+export type AttendanceLog = mock.AttendanceLog;
 
 export type LeaveType = {
   id: string;
@@ -550,6 +565,7 @@ export async function getRoles(): Promise<Role[]> {
 }
 
 export async function getDepartments(): Promise<Department[]> {
+  await ensureAttendanceTablesExist();
   if (!db) {
     console.warn("DATABASE NOT CONFIGURED: Using mock data for getDepartments");
     return toPlain(mock.allDepartments);
@@ -557,12 +573,21 @@ export async function getDepartments(): Promise<Department[]> {
   noStore();
   try {
     const data = await db.query(
-      "SELECT id, name FROM departments ORDER BY name",
+      `SELECT 
+        id, 
+        name, 
+        COALESCE(sign_in_time, '09:00') AS "signInTime", 
+        COALESCE(grace_time_minutes, 15) AS "graceTimeMinutes", 
+        COALESCE(business_address, '100 Tech Park Way, San Francisco, CA 94105') AS "businessAddress", 
+        COALESCE(business_latitude, 37.7749) AS "businessLatitude", 
+        COALESCE(business_longitude, -122.4194) AS "businessLongitude", 
+        COALESCE(allowed_radius_meters, 500) AS "allowedRadiusMeters" 
+       FROM departments ORDER BY name`
     );
     return toPlain(data.rows);
   } catch (error) {
     console.error("Database Error:", error);
-    return [];
+    return toPlain(mock.allDepartments);
   }
 }
 
@@ -910,6 +935,66 @@ export async function getPayslipById(
   }
 }
 
+// --- STATUTORY SETTINGS MANAGEMENT ---
+let memoryStatutoryRules: StatutoryRules = { ...DEFAULT_STATUTORY_RULES };
+
+export async function getStatutorySettings(): Promise<StatutoryRules> {
+  if (!db) {
+    return memoryStatutoryRules;
+  }
+  noStore();
+  try {
+    const res = await db.query(`SELECT rules_json FROM statutory_payroll_settings LIMIT 1`);
+    if (res.rows.length > 0 && res.rows[0].rules_json) {
+      const parsed = typeof res.rows[0].rules_json === "string" ? JSON.parse(res.rows[0].rules_json) : res.rows[0].rules_json;
+      memoryStatutoryRules = { ...DEFAULT_STATUTORY_RULES, ...parsed };
+      return memoryStatutoryRules;
+    }
+  } catch (err: any) {
+    if (err?.code === "42P01") {
+      try {
+        await db.query(`
+          CREATE TABLE IF NOT EXISTS statutory_payroll_settings (
+            id INT PRIMARY KEY DEFAULT 1,
+            rules_json JSONB NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+      } catch (tableErr) {
+        console.error("Failed to create statutory_payroll_settings table:", tableErr);
+      }
+    }
+  }
+  return memoryStatutoryRules;
+}
+
+export async function updateStatutorySettings(newRules: StatutoryRules): Promise<boolean> {
+  memoryStatutoryRules = { ...newRules };
+  if (!db) return true;
+
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS statutory_payroll_settings (
+        id INT PRIMARY KEY DEFAULT 1,
+        rules_json JSONB NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await db.query(`
+      INSERT INTO statutory_payroll_settings (id, rules_json, updated_at)
+      VALUES (1, $1, NOW())
+      ON CONFLICT (id) DO UPDATE
+      SET rules_json = EXCLUDED.rules_json, updated_at = NOW()
+    `, [JSON.stringify(newRules)]);
+
+    return true;
+  } catch (err) {
+    console.error("Error updating statutory rules in DB:", err);
+    return true; // memory fallback
+  }
+}
+
 export async function runPayrollForEmployees(
   employeeIds: string[],
   startDate: Date,
@@ -919,7 +1004,9 @@ export async function runPayrollForEmployees(
     throw new Error("Database not configured. Cannot run payroll.");
   }
 
+  const statutoryRules = await getStatutorySettings();
   const client = await db.connect();
+
   try {
     await client.query("BEGIN");
 
@@ -951,12 +1038,56 @@ export async function runPayrollForEmployees(
 
     let processedCount = 0;
     for (const employeeId of employeeIds) {
-      const details = settingsByEmployee[employeeId];
+      let details = settingsByEmployee[employeeId] || [];
       if (!details || details.length === 0) {
         console.warn(
           `No payroll settings for employee ${employeeId}. Skipping.`,
         );
         continue;
+      }
+
+      // Calculate initial Gross
+      const initialGross = details
+        .filter((d) => d.type === "Earning")
+        .reduce((sum, d) => sum + d.value, 0);
+
+      // Find Basic Salary (or assume 50% of gross if not specified)
+      const basicComp = details.find(
+        (d) => d.type === "Earning" && d.name.toLowerCase().includes("basic")
+      );
+      const basicSalary = basicComp ? basicComp.value : initialGross * 0.5;
+
+      // Calculate Statutory Deductions (PF, ESI/ESU, TDS)
+      const statutory = calculateStatutoryBreakdown(basicSalary, initialGross, statutoryRules);
+
+      // Inject PF if not manually added in settings
+      const hasPf = details.some((d) => d.name.toLowerCase().includes("provident") || d.name.toLowerCase().includes("pf"));
+      if (!hasPf && statutory.pfEmployee > 0) {
+        details.push({
+          name: `PF Contribution (${statutoryRules.employeePfRate}% Basic)`,
+          type: "Deduction",
+          value: statutory.pfEmployee,
+        });
+      }
+
+      // Inject ESI / ESU if not manually added in settings
+      const hasEsi = details.some((d) => d.name.toLowerCase().includes("esi") || d.name.toLowerCase().includes("esu") || d.name.toLowerCase().includes("insurance"));
+      if (!hasEsi && statutory.esiEmployee > 0) {
+        details.push({
+          name: `ESI/ESU Contribution (${statutoryRules.employeeEsiRate}% Gross)`,
+          type: "Deduction",
+          value: statutory.esiEmployee,
+        });
+      }
+
+      // Inject TDS if not manually added in settings
+      const hasTds = details.some((d) => d.name.toLowerCase().includes("tds") || d.name.toLowerCase().includes("tax deducted"));
+      if (!hasTds && statutory.tdsMonthly > 0) {
+        details.push({
+          name: `Tax Deducted at Source (TDS)`,
+          type: "Deduction",
+          value: statutory.tdsMonthly,
+        });
       }
 
       const grossEarnings = details
@@ -965,7 +1096,7 @@ export async function runPayrollForEmployees(
       const totalDeductions = details
         .filter((d: any) => d.type === "Deduction")
         .reduce((sum: any, d: any) => sum + d.value, 0);
-      const netPay = grossEarnings - totalDeductions;
+      const netPay = Math.max(0, grossEarnings - totalDeductions);
 
       await client.query(
         `
@@ -1340,6 +1471,312 @@ export async function getYearlyLeaveBalances(options?: {
   } catch (error) {
     console.error("Database Error getting yearly leave balances:", error);
     return [];
+  }
+}
+
+// --- ATTENDANCE & GEOLOCATION HELPERS ---
+
+export function calculateDistanceMeters(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
+  const R = 6371000;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c);
+}
+
+export async function ensureAttendanceTablesExist() {
+  if (!db) return;
+  try {
+    await db.query(`
+      ALTER TABLE departments ADD COLUMN IF NOT EXISTS sign_in_time VARCHAR(50) DEFAULT '09:00';
+      ALTER TABLE departments ADD COLUMN IF NOT EXISTS grace_time_minutes INT DEFAULT 15;
+      ALTER TABLE departments ADD COLUMN IF NOT EXISTS business_address TEXT DEFAULT '100 Tech Park Way, San Francisco, CA 94105';
+      ALTER TABLE departments ADD COLUMN IF NOT EXISTS business_latitude NUMERIC(10, 7) DEFAULT 37.7749;
+      ALTER TABLE departments ADD COLUMN IF NOT EXISTS business_longitude NUMERIC(10, 7) DEFAULT -122.4194;
+      ALTER TABLE departments ADD COLUMN IF NOT EXISTS allowed_radius_meters INT DEFAULT 500;
+
+      ALTER TABLE employees ADD COLUMN IF NOT EXISTS last_carry_forward_year INT;
+      ALTER TABLE employees ADD COLUMN IF NOT EXISTS employee_id VARCHAR(255);
+      ALTER TABLE employees ADD COLUMN IF NOT EXISTS phone_number VARCHAR(255);
+      ALTER TABLE employees ADD COLUMN IF NOT EXISTS emergency_contact_number VARCHAR(255);
+      ALTER TABLE employees ADD COLUMN IF NOT EXISTS blood_group VARCHAR(50);
+
+      CREATE TABLE IF NOT EXISTS holidays (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name VARCHAR(255) NOT NULL,
+        date DATE NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS statutory_payroll_settings (
+        id INT PRIMARY KEY DEFAULT 1,
+        rules_json JSONB NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS attendance_logs (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        employee_id VARCHAR(255) NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+        date DATE NOT NULL,
+        punch_in_time TIMESTAMP WITH TIME ZONE,
+        punch_out_time TIMESTAMP WITH TIME ZONE,
+        punch_in_lat NUMERIC(10, 7),
+        punch_in_lng NUMERIC(10, 7),
+        punch_in_photo TEXT,
+        distance_meters NUMERIC(10, 2),
+        status VARCHAR(50) NOT NULL DEFAULT 'PUNCHED_IN',
+        notes TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(employee_id, date)
+      );
+    `);
+  } catch (err) {
+    console.warn("ensureAttendanceTablesExist error:", err);
+  }
+}
+
+export async function getDepartmentById(id: string): Promise<Department | null> {
+  const depts = await getDepartments();
+  return depts.find((d) => d.id === id) || null;
+}
+
+export async function getTodayAttendanceLog(employeeId: string): Promise<AttendanceLog | null> {
+  await ensureAttendanceTablesExist();
+  const todayStr = new Date().toISOString().split("T")[0];
+
+  let log: AttendanceLog | null = null;
+
+  if (!db) {
+    const found = mock.allAttendanceLogs.find(
+      (l) => l.employeeId === employeeId && l.date === todayStr
+    );
+    if (found) log = toPlain(found);
+  } else {
+    try {
+      const res = await db.query(
+        `SELECT 
+          al.id,
+          al.employee_id AS "employeeId",
+          e.name AS "employeeName",
+          e.email AS "employeeEmail",
+          d.name AS "departmentName",
+          al.date::text AS "date",
+          al.punch_in_time AS "punchInTime",
+          al.punch_out_time AS "punchOutTime",
+          al.punch_in_lat AS "punchInLat",
+          al.punch_in_lng AS "punchInLng",
+          al.punch_in_photo AS "punchInPhoto",
+          al.distance_meters AS "distanceMeters",
+          al.status
+         FROM attendance_logs al
+         JOIN employees e ON al.employee_id = e.id
+         LEFT JOIN departments d ON e.department_id = d.id
+         WHERE al.employee_id = $1 AND al.date = $2`,
+        [employeeId, todayStr]
+      );
+      if (res.rows.length > 0) {
+        log = toPlain(res.rows[0]);
+      }
+    } catch (err) {
+      console.error("Error fetching today attendance log:", err);
+    }
+  }
+
+  if (log) return log;
+
+  // If no log exists yet, check if employee missed department cutoff time
+  const employee = await getAppUser(employeeId);
+  const departments = await getDepartments();
+  const dept = departments.find((d) => d.id === employee?.departmentId) || departments[0];
+
+  if (dept) {
+    const signInTimeStr = dept.signInTime || "09:00";
+    const graceMins = dept.graceTimeMinutes ?? 15;
+    const [hours, minutes] = signInTimeStr.split(":").map(Number);
+
+    const now = new Date();
+    const cutoffTime = new Date();
+    cutoffTime.setHours(hours, minutes + graceMins, 0, 0);
+
+    if (now > cutoffTime) {
+      const dayOffLog: AttendanceLog = {
+        id: `dayoff-${employeeId}-${todayStr}`,
+        employeeId: employeeId,
+        employeeName: employee?.name,
+        employeeEmail: employee?.email,
+        departmentName: dept.name,
+        date: todayStr,
+        punchInTime: null,
+        punchOutTime: null,
+        punchInLat: null,
+        punchInLng: null,
+        punchInPhoto: null,
+        distanceMeters: null,
+        status: "DAY_OFF",
+        createdAt: new Date().toISOString(),
+      };
+      return dayOffLog;
+    }
+  }
+
+  return null;
+}
+
+export async function getAllAttendanceLogs(): Promise<AttendanceLog[]> {
+  await ensureAttendanceTablesExist();
+  if (!db) {
+    return toPlain(mock.allAttendanceLogs);
+  }
+
+  try {
+    const res = await db.query(
+      `SELECT 
+        al.id,
+        al.employee_id AS "employeeId",
+        e.name AS "employeeName",
+        e.email AS "employeeEmail",
+        d.name AS "departmentName",
+        al.date::text AS "date",
+        al.punch_in_time AS "punchInTime",
+        al.punch_out_time AS "punchOutTime",
+        al.punch_in_lat AS "punchInLat",
+        al.punch_in_lng AS "punchInLng",
+        al.punch_in_photo AS "punchInPhoto",
+        al.distance_meters AS "distanceMeters",
+        al.status
+       FROM attendance_logs al
+       JOIN employees e ON al.employee_id = e.id
+       LEFT JOIN departments d ON e.department_id = d.id
+       ORDER BY al.date DESC, al.created_at DESC`
+    );
+    return toPlain(res.rows);
+  } catch (err) {
+    console.error("Error fetching all attendance logs:", err);
+    return toPlain(mock.allAttendanceLogs);
+  }
+}
+
+export async function savePunchInRecord(data: {
+  employeeId: string;
+  lat: number;
+  lng: number;
+  photo: string;
+  distanceMeters: number;
+}) {
+  await ensureAttendanceTablesExist();
+  const todayStr = new Date().toISOString().split("T")[0];
+  const nowIso = new Date().toISOString();
+
+  const employee = await getAppUser(data.employeeId);
+  const departments = await getDepartments();
+  const dept = departments.find((d) => d.id === employee?.departmentId) || departments[0];
+
+  let isLate = false;
+  if (dept) {
+    const signInTimeStr = dept.signInTime || "09:00";
+    const [hours, minutes] = signInTimeStr.split(":").map(Number);
+    const scheduledTime = new Date();
+    scheduledTime.setHours(hours, minutes, 0, 0);
+    if (new Date() > scheduledTime) {
+      isLate = true;
+    }
+  }
+
+  const status = isLate ? "LATE_PUNCH_IN" : "PUNCHED_IN";
+
+  if (!db) {
+    const existingIndex = mock.allAttendanceLogs.findIndex(
+      (l) => l.employeeId === data.employeeId && l.date === todayStr
+    );
+    const newRecord: mock.AttendanceLog = {
+      id: `att-${Date.now()}`,
+      employeeId: data.employeeId,
+      employeeName: employee?.name,
+      employeeEmail: employee?.email,
+      departmentName: dept?.name || "Engineering",
+      date: todayStr,
+      punchInTime: nowIso,
+      punchOutTime: null,
+      punchInLat: data.lat,
+      punchInLng: data.lng,
+      punchInPhoto: data.photo,
+      distanceMeters: data.distanceMeters,
+      status: status,
+      createdAt: nowIso,
+    };
+    if (existingIndex >= 0) {
+      mock.allAttendanceLogs[existingIndex] = newRecord;
+    } else {
+      mock.allAttendanceLogs.unshift(newRecord);
+    }
+    return newRecord;
+  }
+
+  try {
+    const query = `
+      INSERT INTO attendance_logs 
+        (employee_id, date, punch_in_time, punch_in_lat, punch_in_lng, punch_in_photo, distance_meters, status)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      ON CONFLICT (employee_id, date) 
+      DO UPDATE SET 
+        punch_in_time = EXCLUDED.punch_in_time,
+        punch_in_lat = EXCLUDED.punch_in_lat,
+        punch_in_lng = EXCLUDED.punch_in_lng,
+        punch_in_photo = EXCLUDED.punch_in_photo,
+        distance_meters = EXCLUDED.distance_meters,
+        status = EXCLUDED.status
+      RETURNING id;
+    `;
+    await db.query(query, [
+      data.employeeId,
+      todayStr,
+      nowIso,
+      data.lat,
+      data.lng,
+      data.photo,
+      data.distanceMeters,
+      status,
+    ]);
+  } catch (err) {
+    console.error("Error saving punch in DB record:", err);
+  }
+}
+
+export async function savePunchOutRecord(employeeId: string) {
+  await ensureAttendanceTablesExist();
+  const todayStr = new Date().toISOString().split("T")[0];
+  const nowIso = new Date().toISOString();
+
+  if (!db) {
+    const record = mock.allAttendanceLogs.find(
+      (l) => l.employeeId === employeeId && l.date === todayStr
+    );
+    if (record) {
+      record.punchOutTime = nowIso;
+      record.status = "PUNCHED_OUT";
+    }
+    return;
+  }
+
+  try {
+    await db.query(
+      `UPDATE attendance_logs 
+       SET punch_out_time = $1, status = 'PUNCHED_OUT' 
+       WHERE employee_id = $2 AND date = $3`,
+      [nowIso, employeeId, todayStr]
+    );
+  } catch (err) {
+    console.error("Error saving punch out DB record:", err);
   }
 }
 

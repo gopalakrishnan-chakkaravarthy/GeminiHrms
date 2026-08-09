@@ -1,6 +1,7 @@
 import { LeaveBalanceCards } from "@/components/app/leave-balance-cards";
 import { LeaveRequestsTable } from "@/components/app/leave-requests-table";
 import { RequestLeaveDialog } from "@/components/app/request-leave-dialog";
+import { AttendancePunchCard } from "@/components/app/attendance-punch-card";
 import {
   Card,
   CardContent,
@@ -16,6 +17,8 @@ import {
   getLeaveBalances,
   getYearlyLeaveBalances,
   getFallbackUserId,
+  getTodayAttendanceLog,
+  getDepartments,
 } from "@/lib/data";
 import { YearlyLeaveBalancesWidget } from "@/components/app/yearly-leave-balances-widget";
 import { getAuthenticatedUserId } from "@/lib/auth";
@@ -23,6 +26,7 @@ import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { runCarryForwardLogicForUser } from "./actions";
+import { isPunchInEnabled } from "@/lib/feature-flags";
 
 export default async function DashboardPage() {
   let userId: string | null = null;
@@ -71,14 +75,17 @@ export default async function DashboardPage() {
   }
 
   const currentYear = new Date().getFullYear();
-  const [userRequests, leaveTypes, leaveBalances, yearlyBalances] = await Promise.all([
+  const [userRequests, leaveTypes, leaveBalances, yearlyBalances, todayLog, departments] = await Promise.all([
     getLeaveRequestsForCurrentUser(userId),
     getLeaveTypes(),
     getLeaveBalances(userId),
     getYearlyLeaveBalances({ year: currentYear, employeeId: userId }),
+    getTodayAttendanceLog(userId),
+    getDepartments(),
   ]);
 
-  const displayName = clerkUser?.firstName || appUser.name || "User";
+  const userDept = departments.find((d) => d.id === appUser.departmentId) || departments[0];
+  const displayName = appUser.name || "User";
 
   return (
     <div className="space-y-6">
@@ -88,7 +95,7 @@ export default async function DashboardPage() {
             Dashboard
           </h1>
           <p className="text-muted-foreground">
-            Welcome back, {displayName}. Here's your leave summary.
+            Welcome back, {displayName}. Here's your attendance and leave summary.
           </p>
         </div>
         <RequestLeaveDialog
@@ -97,6 +104,14 @@ export default async function DashboardPage() {
           leaveBalances={leaveBalances}
         />
       </div>
+
+      {/* Attendance & Punch In Prompt */}
+      {isPunchInEnabled() && userDept && (
+        <AttendancePunchCard
+          todayLog={todayLog}
+          department={userDept}
+        />
+      )}
 
       <YearlyLeaveBalancesWidget
         initialData={yearlyBalances}

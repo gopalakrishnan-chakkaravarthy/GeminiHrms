@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { StatCard } from '@/components/app/stat-card';
 import { ReportsChart } from '@/components/app/reports-chart';
 import { CreateLeaveOnBehalfDialog } from '@/components/app/create-leave-on-behalf-dialog';
+import { isReportsEnabled } from '@/lib/feature-flags';
 
 
 function ManagementCard({ title, description, href, icon: Icon }: { title: string, description: string, href: string, icon: React.ElementType }) {
@@ -180,12 +181,14 @@ export default async function AdminPage() {
                     href="/dashboard/admin/carry-forward"
                     icon={Repeat}
                 />
-                 <ManagementCard 
-                    title="Reports"
-                    description="View leave trend reports." 
-                    href="/dashboard/admin/reports"
-                    icon={BarChart3}
-                />
+                {isReportsEnabled() && (
+                  <ManagementCard 
+                      title="Reports"
+                      description="View leave trend reports." 
+                      href="/dashboard/admin/reports"
+                      icon={BarChart3}
+                  />
+                )}
                 <ManagementCard 
                     title="Payroll"
                     description="Manage payroll and payslips." 
