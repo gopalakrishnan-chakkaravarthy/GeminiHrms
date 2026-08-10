@@ -174,7 +174,9 @@ export type PayslipDetailsItem = {
 
 export type PopulatedPayslip = {
   id: string;
+  employeeId?: string;
   employeeName: string;
+  employeeEmail?: string;
   departmentName: string;
   roleName: string;
   payPeriod: string;
@@ -188,7 +190,9 @@ export type PopulatedPayslip = {
 
 export type PopulatedPayslipSummary = {
   id: string;
+  employeeId?: string;
   employeeName: string;
+  employeeEmail?: string;
   payPeriodStart: Date;
   payPeriodEnd: Date;
   grossEarnings?: number;
@@ -812,19 +816,22 @@ export async function getPayslips(): Promise<PopulatedPayslipSummary[]> {
     console.warn("DATABASE NOT CONFIGURED: Using mock data for getPayslips");
     const statuses = ["Sent", "Processed", "Draft"];
     const formattedMock = mock.allPayslips
-      .map((p, idx) => ({
-        id: p.id,
-        employeeName:
-          mock.allEmployees.find((e) => e.id === p.employee_id)?.name ||
-          "Unknown",
-        payPeriodStart: p.pay_period_start,
-        payPeriodEnd: p.pay_period_end,
-        grossEarnings: parseFloat(p.gross_earnings || "0"),
-        totalDeductions: parseFloat(p.total_deductions || "0"),
-        netPay: parseFloat(p.net_pay),
-        status: p.status || statuses[idx % statuses.length],
-        createdAt: p.created_at,
-      }))
+      .map((p, idx) => {
+        const emp = mock.allEmployees.find((e) => e.id === p.employee_id);
+        return {
+          id: p.id,
+          employeeId: p.employee_id,
+          employeeName: emp?.name || "Unknown",
+          employeeEmail: emp?.email || "employee@company.com",
+          payPeriodStart: p.pay_period_start,
+          payPeriodEnd: p.pay_period_end,
+          grossEarnings: parseFloat(p.gross_earnings || "0"),
+          totalDeductions: parseFloat(p.total_deductions || "0"),
+          netPay: parseFloat(p.net_pay),
+          status: p.status || statuses[idx % statuses.length],
+          createdAt: p.created_at,
+        };
+      })
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
     return toPlain(formattedMock);
   }
@@ -833,7 +840,9 @@ export async function getPayslips(): Promise<PopulatedPayslipSummary[]> {
     const data = await db.query(`
             SELECT 
                 p.id,
+                p.employee_id as "employeeId",
                 COALESCE(e.name, 'Former Employee') as "employeeName",
+                COALESCE(e.email, 'employee@company.com') as "employeeEmail",
                 p.pay_period_start as "payPeriodStart",
                 p.pay_period_end as "payPeriodEnd",
                 p.gross_earnings as "grossEarnings",
@@ -873,7 +882,9 @@ export async function getPayslipById(
 
     return toPlain({
       id: mockPayslip.id,
+      employeeId: employee.id,
       employeeName: employee.name,
+      employeeEmail: employee.email,
       departmentName: employee.departmentName,
       roleName: employee.roleName,
       payPeriod: `${format(
@@ -883,6 +894,7 @@ export async function getPayslipById(
       grossEarnings: parseFloat(mockPayslip.gross_earnings),
       totalDeductions: parseFloat(mockPayslip.total_deductions),
       netPay: parseFloat(mockPayslip.net_pay),
+      status: mockPayslip.status || "Processed",
       details: mockPayslip.details,
       createdAt: mockPayslip.created_at,
     });
@@ -893,7 +905,9 @@ export async function getPayslipById(
       `
             SELECT
                 p.id,
+                p.employee_id AS "employeeId",
                 COALESCE(e.name, 'Former Employee') AS "employeeName",
+                COALESCE(e.email, 'employee@company.com') AS "employeeEmail",
                 COALESCE(d.name, 'No Department') AS "departmentName",
                 COALESCE(r.name, 'No Role') AS "roleName",
                 p.pay_period_start,
@@ -901,6 +915,7 @@ export async function getPayslipById(
                 p.gross_earnings,
                 p.total_deductions,
                 p.net_pay,
+                COALESCE(p.status, 'Processed') AS "status",
                 p.details,
                 p.created_at
             FROM payslips p
@@ -916,7 +931,9 @@ export async function getPayslipById(
     const row = data.rows[0];
     return toPlain({
       id: row.id,
+      employeeId: row.employeeId,
       employeeName: row.employeeName,
+      employeeEmail: row.employeeEmail,
       departmentName: row.departmentName,
       roleName: row.roleName,
       payPeriod: `${format(new Date(row.pay_period_start), "MMM dd, yyyy")} - ${format(
@@ -926,6 +943,7 @@ export async function getPayslipById(
       grossEarnings: parseFloat(row.gross_earnings || 0),
       totalDeductions: parseFloat(row.total_deductions || 0),
       netPay: parseFloat(row.net_pay || 0),
+      status: row.status || "Processed",
       details: row.details,
       createdAt: row.created_at,
     });

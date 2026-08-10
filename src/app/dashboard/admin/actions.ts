@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { generateLeaveStatusEmail } from "@/lib/email";
+import { generateLeaveStatusEmail, sendEmployeeOnboardingEmail, sendPasswordResetEmail } from "@/lib/email";
 import { runPayrollForEmployees, updateStatutorySettings, db, getAppUser, getFallbackUserId } from "@/lib/data";
 import { formatLocalDate, parseLocalDate } from "@/lib/utils";
 import { format, parseISO, differenceInDays } from "date-fns";
@@ -1240,13 +1240,39 @@ export async function createEmployeeAction(
       );
     }
 
+    // Lookup role and department names for email notification
+    let roleName = null;
+    let departmentName = null;
+    try {
+      const roleRes = await client.query("SELECT name FROM roles WHERE id = $1", [roleId]);
+      if (roleRes.rows.length > 0) roleName = roleRes.rows[0].name;
+      const deptRes = await client.query("SELECT name FROM departments WHERE id = $1", [departmentId]);
+      if (deptRes.rows.length > 0) departmentName = deptRes.rows[0].name;
+    } catch {
+      // Ignore lookup failure for email
+    }
+
     await client.query("COMMIT");
+
+    // Send onboarding email with login credentials
+    try {
+      await sendEmployeeOnboardingEmail({
+        name,
+        email,
+        password: rawPassword,
+        employeeId: finalEmpCode,
+        roleName,
+        departmentName,
+      });
+    } catch (e) {
+      console.error("Failed to send welcome email:", e);
+    }
 
     revalidatePath("/dashboard/admin/employees");
     revalidatePath("/dashboard");
     return {
       success: true,
-      message: `Created employee "${name}" and initialized leave balances.`,
+      message: `Created employee "${name}" with default password "${rawPassword}" and sent onboarding email to ${email}.`,
     };
   } catch (error: any) {
     await client.query("ROLLBACK");
@@ -1934,4 +1960,295 @@ export async function updateStatutorySettingsAction(
     };
   }
 }
+
+// --- BULK EMPLOYEE EXCEL UPLOAD ACTION ---
+
+export type BulkEmployeeInputRow = {
+  name: string;
+  email: string;
+  role?: string;
+  department?: string;
+  managerEmailOrId?: string;
+  employeeId?: string;
+  phoneNumber?: string;
+  emergencyContactNumber?: string;
+  bloodGroup?: string;
+  defaultPassword?: string;
+};
+
+export type BulkImportResult = {
+  success: boolean;
+  message: string;
+  totalProcessed: number;
+  successCount: number;
+  failedCount: number;
+  importedEmployees: Array<{ name: string; email: string; defaultPassword: string; employeeId?: string }>;
+  errors: Array<{ rowNumber: number; email?: string; name?: string; reason: string }>;
+};
+
+export async function bulkCreateEmployeesAction(
+  rows: BulkEmployeeInputRow[]
+): Promise<BulkImportResult> {
+  if (!rows || !Array.isArray(rows) || rows.length === 0) {
+    return {
+      success: false,
+      message: "No employee data provided for import.",
+      totalProcessed: 0,
+      successCount: 0,
+      failedCount: 0,
+      importedEmployees: [],
+      errors: [{ rowNumber: 0, reason: "The uploaded file contains no valid rows." }],
+    };
+  }
+
+  if (!db) {
+    return {
+      success: false,
+      message: "Database connection unavailable.",
+      totalProcessed: rows.length,
+      successCount: 0,
+      failedCount: rows.length,
+      importedEmployees: [],
+      errors: [{ rowNumber: 0, reason: "Database connection lost or unavailable." }],
+    };
+  }
+
+  await ensurePasswordColumnExists();
+  const client = await db.connect();
+
+  const importedEmployees: Array<{ name: string; email: string; defaultPassword: string; employeeId?: string }> = [];
+  const errors: Array<{ rowNumber: number; email?: string; name?: string; reason: string }> = [];
+
+  try {
+    const rolesRes = await client.query("SELECT id, name FROM roles");
+    const deptsRes = await client.query("SELECT id, name FROM departments");
+    const empsRes = await client.query("SELECT id, name, email, employee_id FROM employees");
+
+    const rolesMap = new Map<string, string>();
+    rolesRes.rows.forEach((r) => {
+      rolesMap.set(r.name.toLowerCase(), r.id);
+      rolesMap.set(r.id, r.id);
+    });
+
+    const deptsMap = new Map<string, string>();
+    deptsRes.rows.forEach((d) => {
+      deptsMap.set(d.name.toLowerCase(), d.id);
+      deptsMap.set(d.id, d.id);
+    });
+
+    const defaultRoleId = rolesRes.rows[0]?.id || "";
+    const defaultDeptId = deptsRes.rows[0]?.id || "";
+
+    const empLookups = new Map<string, string>();
+    empsRes.rows.forEach((e) => {
+      empLookups.set(e.id.toLowerCase(), e.id);
+      if (e.email) empLookups.set(e.email.toLowerCase(), e.id);
+      if (e.employee_id) empLookups.set(e.employee_id.toLowerCase(), e.id);
+    });
+
+    const currentYear = new Date().getFullYear();
+
+    for (let i = 0; i < rows.length; i++) {
+      const rowNum = i + 1;
+      const row = rows[i];
+      const name = (row.name || "").trim();
+      const email = (row.email || "").trim().toLowerCase();
+
+      if (!name || name.length < 2) {
+        errors.push({ rowNumber: rowNum, email, name, reason: "Full Name is required (minimum 2 characters)." });
+        continue;
+      }
+
+      if (!email || !email.includes("@")) {
+        errors.push({ rowNumber: rowNum, email, name, reason: "Invalid or missing email address." });
+        continue;
+      }
+
+      if (empLookups.has(email)) {
+        errors.push({ rowNumber: rowNum, email, name, reason: `An employee with email "${email}" already exists.` });
+        continue;
+      }
+
+      const rawEmpId = (row.employeeId || "").trim();
+      if (rawEmpId && empLookups.has(rawEmpId.toLowerCase())) {
+        errors.push({ rowNumber: rowNum, email, name, reason: `Employee ID "${rawEmpId}" already exists.` });
+        continue;
+      }
+
+      // Match Role
+      let roleId = defaultRoleId;
+      const roleSearch = (row.role || "").trim().toLowerCase();
+      if (roleSearch && rolesMap.has(roleSearch)) {
+        roleId = rolesMap.get(roleSearch)!;
+      }
+
+      // Match Department
+      let deptId = defaultDeptId;
+      const deptSearch = (row.department || "").trim().toLowerCase();
+      if (deptSearch && deptsMap.has(deptSearch)) {
+        deptId = deptsMap.get(deptSearch)!;
+      }
+
+      // Match Manager
+      let managerId: string | null = null;
+      const mgrSearch = (row.managerEmailOrId || "").trim().toLowerCase();
+      if (mgrSearch && empLookups.has(mgrSearch)) {
+        managerId = empLookups.get(mgrSearch)!;
+      }
+
+      // Default password handling
+      const rawPassword = (row.defaultPassword || "").trim() || `Welcome#${Math.random().toString(36).substring(2, 6)}`;
+      const hashedPassword = await hashPassword(rawPassword);
+
+      const userId = `user_${Date.now()}_${i}_${Math.random().toString(36).substring(2, 6)}`;
+      const empCode = rawEmpId || null;
+      const avatarUrl = `https://placehold.co/100x100.png`;
+
+      try {
+        await client.query("BEGIN");
+
+        await client.query(
+          `INSERT INTO employees (id, name, email, avatar_url, role_id, department_id, manager_id, leave_history, employee_id, phone_number, emergency_contact_number, blood_group, password)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+          [
+            userId,
+            name,
+            email,
+            avatarUrl,
+            roleId,
+            deptId,
+            managerId,
+            "",
+            empCode,
+            row.phoneNumber || null,
+            row.emergencyContactNumber || null,
+            row.bloodGroup || null,
+            hashedPassword,
+          ]
+        );
+
+        // Populate initial leave balances
+        const policiesRes = await client.query(
+          "SELECT leave_type_id, days_allowed FROM leave_policies WHERE role_id = $1",
+          [roleId]
+        );
+        for (const policy of policiesRes.rows) {
+          await client.query(
+            "INSERT INTO leave_balances (employee_id, leave_type_id, balance, year) VALUES ($1, $2, $3, $4)",
+            [userId, policy.leave_type_id, policy.days_allowed, currentYear]
+          );
+        }
+
+        await client.query("COMMIT");
+
+        empLookups.set(email, userId);
+        empLookups.set(userId, userId);
+        if (empCode) empLookups.set(empCode.toLowerCase(), userId);
+
+        importedEmployees.push({
+          name,
+          email,
+          defaultPassword: rawPassword,
+          employeeId: empCode || undefined,
+        });
+
+        // Trigger welcome email dispatch asynchronously
+        const matchedRoleName = rolesRes.rows.find(r => r.id === roleId)?.name || null;
+        const matchedDeptName = deptsRes.rows.find(d => d.id === deptId)?.name || null;
+        sendEmployeeOnboardingEmail({
+          name,
+          email,
+          password: rawPassword,
+          employeeId: empCode,
+          roleName: matchedRoleName,
+          departmentName: matchedDeptName,
+        }).catch((e) => console.error(`Email dispatch error for ${email}:`, e));
+
+      } catch (err: any) {
+        await client.query("ROLLBACK");
+        console.error(`Error importing row ${rowNum} (${email}):`, err);
+        errors.push({ rowNumber: rowNum, email, name, reason: err.message || "Database insert failed." });
+      }
+    }
+
+    revalidatePath("/dashboard/admin/employees");
+    revalidatePath("/dashboard");
+
+    return {
+      success: importedEmployees.length > 0,
+      message: `Successfully imported ${importedEmployees.length} employee(s). ${errors.length > 0 ? `${errors.length} failed/skipped.` : ""}`,
+      totalProcessed: rows.length,
+      successCount: importedEmployees.length,
+      failedCount: errors.length,
+      importedEmployees,
+      errors,
+    };
+  } finally {
+    client.release();
+  }
+}
+
+// --- ADMIN RESET PASSWORD ACTION ---
+
+export async function resetEmployeePasswordAction({
+  employeeId,
+  customPassword,
+  sendEmail = true,
+}: {
+  employeeId: string;
+  customPassword?: string;
+  sendEmail?: boolean;
+}): Promise<{ success: boolean; message: string; newPassword?: string }> {
+  if (!employeeId) {
+    return { success: false, message: "Employee ID is required." };
+  }
+
+  if (!db) {
+    return { success: false, message: "Database connection unavailable." };
+  }
+
+  try {
+    await ensurePasswordColumnExists();
+
+    const empRes = await db.query(
+      "SELECT id, name, email FROM employees WHERE id = $1",
+      [employeeId]
+    );
+
+    if (empRes.rows.length === 0) {
+      return { success: false, message: "Employee not found." };
+    }
+
+    const emp = empRes.rows[0];
+    const newPassword = (customPassword || "").trim() || `Pass#${Math.random().toString(36).substring(2, 8)}`;
+    const hashedPassword = await hashPassword(newPassword);
+
+    await db.query("UPDATE employees SET password = $1 WHERE id = $2", [hashedPassword, employeeId]);
+
+    if (sendEmail && emp.email) {
+      try {
+        await sendPasswordResetEmail({
+          name: emp.name,
+          email: emp.email,
+          newPassword,
+        });
+      } catch (err) {
+        console.error("Password reset email dispatch error:", err);
+      }
+    }
+
+    revalidatePath("/dashboard/admin/employees");
+    revalidatePath("/dashboard");
+
+    return {
+      success: true,
+      message: `Password reset successfully for ${emp.name}. An email with the new password has been sent to ${emp.email}.`,
+      newPassword,
+    };
+  } catch (err: any) {
+    console.error("Reset password action error:", err);
+    return { success: false, message: err.message || "Failed to reset employee password." };
+  }
+}
+
 

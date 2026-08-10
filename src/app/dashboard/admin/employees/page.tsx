@@ -1,5 +1,6 @@
 import { EmployeesTable } from '@/components/app/employees-table';
 import { CreateEmployeeDialog } from '@/components/app/create-employee-dialog';
+import { ExcelBulkUploadDialog } from '@/components/app/excel-bulk-upload-dialog';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { getEmployees, getRoles, getDepartments } from '@/lib/data';
 
@@ -15,7 +16,10 @@ export default async function EmployeesPage() {
                 <h1 className="text-2xl md:text-3xl font-bold tracking-tight font-headline">Employee Management</h1>
                 <p className="text-muted-foreground">View and manage employee details, roles, and departments.</p>
             </div>
-            <CreateEmployeeDialog roles={allRoles} departments={allDepartments} employees={allEmployees} />
+            <div className="flex items-center gap-2 flex-wrap">
+              <ExcelBulkUploadDialog roles={allRoles} departments={allDepartments} employees={allEmployees} />
+              <CreateEmployeeDialog roles={allRoles} departments={allDepartments} employees={allEmployees} />
+            </div>
         </div>
 
         <Card>

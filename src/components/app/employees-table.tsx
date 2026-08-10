@@ -17,7 +17,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Pencil, Loader2, Trash2 } from "lucide-react";
+import { MoreHorizontal, Pencil, Loader2, Trash2, KeyRound } from "lucide-react";
 import type { Employee, Role, Department } from "@/lib/data";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -45,6 +45,7 @@ import {
 import { toast, useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "../ui/scroll-area";
 import { DeleteConfirmationDialog } from "./delete-confirmation-dialog";
+import { ResetPasswordDialog } from "./reset-password-dialog";
 
 // Edit Dialog
 function SubmitButton() {
@@ -291,8 +292,8 @@ export function EmployeesTable({
   departments,
 }: EmployeesTableProps) {
   const [isEditOpen, setIsEditOpen] = useState(false);
-
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isResetPasswordOpen, setIsResetPasswordOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(
     null
   );
@@ -300,6 +301,11 @@ export function EmployeesTable({
   const handleEdit = (employee: Employee) => {
     setSelectedEmployee(employee);
     setIsEditOpen(true);
+  };
+
+  const handleResetPassword = (employee: Employee) => {
+    setSelectedEmployee(employee);
+    setIsResetPasswordOpen(true);
   };
 
   const handleDelete = (setting: Employee) => {
@@ -382,6 +388,10 @@ export function EmployeesTable({
                       <Pencil className="mr-2 h-4 w-4" />
                       Edit
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleResetPassword(employee)}>
+                      <KeyRound className="mr-2 h-4 w-4 text-amber-600" />
+                      Reset Password
+                    </DropdownMenuItem>
                     <DropdownMenuItem
                       className="text-red-600 focus:text-red-600"
                       onClick={() => handleDelete(employee)}
@@ -403,6 +413,11 @@ export function EmployeesTable({
         departments={departments}
         open={isEditOpen}
         onOpenChange={setIsEditOpen}
+      />
+      <ResetPasswordDialog
+        employee={selectedEmployee}
+        open={isResetPasswordOpen}
+        onOpenChange={setIsResetPasswordOpen}
       />
       <DeleteConfirmationDialog
         open={isDeleteOpen}
