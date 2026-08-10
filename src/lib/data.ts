@@ -1513,8 +1513,10 @@ export function calculateDistanceMeters(
   return Math.round(R * c);
 }
 
+let attendanceTablesInitialized = false;
+
 export async function ensureAttendanceTablesExist() {
-  if (!db) return;
+  if (!db || attendanceTablesInitialized) return;
   try {
     await db.query(`
       ALTER TABLE departments ADD COLUMN IF NOT EXISTS sign_in_time VARCHAR(50) DEFAULT '09:00';
@@ -1558,6 +1560,7 @@ export async function ensureAttendanceTablesExist() {
         UNIQUE(employee_id, date)
       );
     `);
+    attendanceTablesInitialized = true;
   } catch (err) {
     console.warn("ensureAttendanceTablesExist error:", err);
   }

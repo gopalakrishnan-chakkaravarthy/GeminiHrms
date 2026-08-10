@@ -1314,6 +1314,7 @@ const UpdateEmployeeSchema = z.object({
   phoneNumber: z.string().optional(),
   emergencyContactNumber: z.string().optional(),
   bloodGroup: z.string().optional(),
+  password: z.string().optional(),
 });
 
 export async function updateEmployeeAction(
@@ -1324,6 +1325,8 @@ export async function updateEmployeeAction(
   const managerId =
     rawManagerId === "null" || rawManagerId === "" ? null : rawManagerId;
 
+  const rawPassword = (formData.get("password") as string)?.trim();
+
   const validatedFields = UpdateEmployeeSchema.safeParse({
     id: formData.get("id"),
     roleId: formData.get("roleId"),
@@ -1333,6 +1336,7 @@ export async function updateEmployeeAction(
     phoneNumber: formData.get("phoneNumber"),
     emergencyContactNumber: formData.get("emergencyContactNumber"),
     bloodGroup: formData.get("bloodGroup"),
+    password: rawPassword,
   });
 
   if (!validatedFields.success) {
@@ -1351,6 +1355,7 @@ export async function updateEmployeeAction(
     phoneNumber,
     emergencyContactNumber,
     bloodGroup,
+    password,
   } = validatedFields.data;
   const finalManagerId = validatedFields.data.managerId; // Use validated managerId
 
@@ -1361,6 +1366,7 @@ export async function updateEmployeeAction(
 
   try {
     await client.query("BEGIN");
+    await ensurePasswordColumnExists();
 
     // Get old role to see if it changed
     const oldEmployeeRes = await client.query(
@@ -1390,6 +1396,14 @@ export async function updateEmployeeAction(
         id,
       ],
     );
+
+    if (password && password.length > 0) {
+      const encryptedPassword = await hashPassword(password);
+      await client.query("UPDATE employees SET password = $1 WHERE id = $2", [
+        encryptedPassword,
+        id,
+      ]);
+    }
 
     // If role changed, update leave balances
     if (oldRoleId !== roleId) {
