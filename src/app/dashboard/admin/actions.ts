@@ -1095,6 +1095,7 @@ const EmployeeSchema = z.object({
   phoneNumber: z.string().optional(),
   emergencyContactNumber: z.string().optional(),
   bloodGroup: z.string().optional(),
+  password: z.string().optional(),
 });
 
 export async function createEmployeeAction(
@@ -1124,6 +1125,7 @@ export async function createEmployeeAction(
     phoneNumber: formData.get("phoneNumber"),
     emergencyContactNumber: formData.get("emergencyContactNumber"),
     bloodGroup: formData.get("bloodGroup"),
+    password: formData.get("password"),
   });
 
   if (!validatedFields.success) {
