@@ -40,12 +40,18 @@ export default async function DashboardPage() {
     redirect('/login');
   }
 
-  const defaultScreen = await getDefaultScreenForUser(userId);
-  if (defaultScreen && defaultScreen !== "/dashboard") {
-    redirect(defaultScreen);
-  }
-
   const appUser = await getAppUser(userId);
+
+  // Redirect privileged users to their default screen (Admin/Manager only).
+  // Employees are never redirected — prevents infinite loop when middleware blocks privileged paths.
+  const role = appUser?.roleName?.toLowerCase() ?? "";
+  const isPrivileged = role === "administrator" || role === "admin" || role === "manager";
+  if (isPrivileged) {
+    const defaultScreen = await getDefaultScreenForUser(userId);
+    if (defaultScreen && defaultScreen !== "/dashboard") {
+      redirect(defaultScreen);
+    }
+  }
 
   if (!appUser) {
     return (
