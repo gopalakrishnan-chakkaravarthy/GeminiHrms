@@ -124,7 +124,7 @@ export function HolidaysTable({ holidays }: HolidaysTableProps) {
                     variant="outline"
                     size="icon"
                     onClick={() => handleAddToCalendar(holiday)}
-                    disabled={isPending || !user}
+                    disabled={isPending || !userEmail}
                     title="Send Calendar Invite"
                   >
                     {isAddingToCalendar === holiday.id ? (

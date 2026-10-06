@@ -30,9 +30,12 @@ export function CompanyCalendar({
   }, []);
 
   const holidaysByDate = React.useMemo(() => {
-    return holidays.reduce(
+    return (holidays || []).reduce(
       (acc, holiday) => {
-        const dateKey = format(new Date(holiday.date), "yyyy-MM-dd");
+        if (!holiday?.date) return acc;
+        const d = parseLocalDate(holiday.date);
+        if (isNaN(d.getTime())) return acc;
+        const dateKey = format(d, "yyyy-MM-dd");
         if (!acc[dateKey]) {
           acc[dateKey] = [];
         }
@@ -44,22 +47,27 @@ export function CompanyCalendar({
   }, [holidays]);
 
   const leavesByDate = React.useMemo(() => {
-    return approvedLeaves.reduce(
+    return (approvedLeaves || []).reduce(
       (acc, leave) => {
-        const interval = eachDayOfInterval({
-          start: parseLocalDate(leave.startDate),
-          end: parseLocalDate(leave.endDate),
-        });
-        interval.forEach((day) => {
-          const dateKey = format(day, "yyyy-MM-dd");
-          if (!acc[dateKey]) {
-            acc[dateKey] = [];
-          }
-          acc[dateKey].push({
-            type: "leave",
-            name: `${leave.employeeName} (${leave.leaveType})`,
+        if (!leave?.startDate || !leave?.endDate) return acc;
+        const start = parseLocalDate(leave.startDate);
+        const end = parseLocalDate(leave.endDate);
+        if (isNaN(start.getTime()) || isNaN(end.getTime()) || start > end) return acc;
+        try {
+          const interval = eachDayOfInterval({ start, end });
+          interval.forEach((day) => {
+            const dateKey = format(day, "yyyy-MM-dd");
+            if (!acc[dateKey]) {
+              acc[dateKey] = [];
+            }
+            acc[dateKey].push({
+              type: "leave",
+              name: `${leave.employeeName} (${leave.leaveType})`,
+            });
           });
-        });
+        } catch {
+          // ignore invalid interval
+        }
         return acc;
       },
       {} as Record<string, { type: "leave"; name: string }[]>
@@ -67,7 +75,10 @@ export function CompanyCalendar({
   }, [approvedLeaves]);
 
   const eventsByDate = React.useMemo(() => {
-    const allEvents = { ...holidaysByDate };
+    const allEvents: Record<string, ({ type: "holiday" | "leave"; name: string })[]> = {};
+    Object.keys(holidaysByDate).forEach((dateKey) => {
+      allEvents[dateKey] = [...holidaysByDate[dateKey]];
+    });
     Object.keys(leavesByDate).forEach((dateKey) => {
       if (!allEvents[dateKey]) {
         allEvents[dateKey] = [];
@@ -77,12 +88,28 @@ export function CompanyCalendar({
     return allEvents;
   }, [holidaysByDate, leavesByDate]);
 
-  const modifiers = {
-    holiday: holidays.map((h) => parseLocalDate(h.date)),
-    leave: approvedLeaves.flatMap((l) =>
-      eachDayOfInterval({ start: parseLocalDate(l.startDate), end: parseLocalDate(l.endDate) })
-    ),
-  };
+  const modifiers = React.useMemo(() => {
+    const validHolidays = (holidays || [])
+      .map((h) => (h?.date ? parseLocalDate(h.date) : null))
+      .filter((d): d is Date => d !== null && !isNaN(d.getTime()));
+
+    const validLeaves = (approvedLeaves || []).flatMap((l) => {
+      if (!l?.startDate || !l?.endDate) return [];
+      const start = parseLocalDate(l.startDate);
+      const end = parseLocalDate(l.endDate);
+      if (isNaN(start.getTime()) || isNaN(end.getTime()) || start > end) return [];
+      try {
+        return eachDayOfInterval({ start, end });
+      } catch {
+        return [];
+      }
+    });
+
+    return {
+      holiday: validHolidays,
+      leave: validLeaves,
+    };
+  }, [holidays, approvedLeaves]);
 
   const modifierStyles = {
     holiday: {

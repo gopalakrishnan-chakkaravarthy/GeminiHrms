@@ -42,7 +42,8 @@ CREATE TABLE IF NOT EXISTS employees (
     employee_id VARCHAR(255),
     phone_number VARCHAR(255),
     emergency_contact_number VARCHAR(255),
-    blood_group VARCHAR(50)
+    blood_group VARCHAR(50),
+    password VARCHAR(255)
 );
 
 -- Ensure employee columns exist on existing tables
@@ -51,6 +52,7 @@ ALTER TABLE employees ADD COLUMN IF NOT EXISTS employee_id VARCHAR(255);
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS phone_number VARCHAR(255);
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS emergency_contact_number VARCHAR(255);
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS blood_group VARCHAR(50);
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS password VARCHAR(255);
 
 -- Holidays Table
 CREATE TABLE IF NOT EXISTS holidays (

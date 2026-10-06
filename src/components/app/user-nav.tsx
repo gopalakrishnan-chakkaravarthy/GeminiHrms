@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Avatar,
@@ -17,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { User } from "@/lib/data";
+import { ChangePasswordDialog } from "@/components/app/change-password-dialog";
 
 type UserNavProps = {
   user: User;
@@ -24,6 +26,7 @@ type UserNavProps = {
 
 export function UserNav({ user }: UserNavProps) {
   const router = useRouter();
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
   const handleSignOut = async () => {
     try {
@@ -73,6 +76,9 @@ export function UserNav({ user }: UserNavProps) {
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuItem onClick={() => router.push("/dashboard")}>Dashboard</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setChangePasswordOpen(true)} className="cursor-pointer">
+            Change Password
+          </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleSignOut} className="text-red-600 cursor-pointer">
@@ -80,5 +86,6 @@ export function UserNav({ user }: UserNavProps) {
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+    <ChangePasswordDialog open={changePasswordOpen} onOpenChange={setChangePasswordOpen} />
   );
 }

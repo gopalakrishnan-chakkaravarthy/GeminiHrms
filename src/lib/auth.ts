@@ -44,23 +44,82 @@ export async function verifyJwt(token: string): Promise<JwtPayload | null> {
   }
 }
 
+import crypto from "crypto";
+
+const ENCRYPTION_KEY_STRING = process.env.ENCRYPTION_KEY || process.env.JWT_SECRET || "absence-ace-secret-key-32-chars!!";
+const ENCRYPTION_KEY = crypto.scryptSync(ENCRYPTION_KEY_STRING, "salt", 32);
+
 /**
- * Hash password using bcrypt
+ * Encrypt a plain text password using AES-256-GCM
  */
-export async function hashPassword(password: string): Promise<string> {
-  return await bcrypt.hash(password, 10);
+export function encryptPassword(text: string): string {
+  if (!text) return "";
+  try {
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv("aes-256-gcm", ENCRYPTION_KEY, iv);
+    let encrypted = cipher.update(text, "utf8", "hex");
+    encrypted += cipher.final("hex");
+    const authTag = cipher.getAuthTag().toString("hex");
+    return `enc:${iv.toString("hex")}:${authTag}:${encrypted}`;
+  } catch (err) {
+    console.error("Encryption error:", err);
+    return text;
+  }
 }
 
 /**
- * Verify password against hash or fallback plain text
+ * Decrypt an encrypted password string using AES-256-GCM
  */
-export async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  if (!hash) return false;
-  // Support legacy or plain text comparison if password wasn't hashed yet
-  if (!hash.startsWith("$2a$") && !hash.startsWith("$2b$") && !hash.startsWith("$2y$")) {
-    return password === hash;
+export function decryptPassword(encryptedText: string): string {
+  if (!encryptedText) return "";
+  if (!encryptedText.startsWith("enc:")) {
+    return encryptedText;
   }
-  return await bcrypt.compare(password, hash);
+  try {
+    const parts = encryptedText.split(":");
+    if (parts.length !== 4) return "";
+    const iv = Buffer.from(parts[1], "hex");
+    const authTag = Buffer.from(parts[2], "hex");
+    const encrypted = parts[3];
+
+    const decipher = crypto.createDecipheriv("aes-256-gcm", ENCRYPTION_KEY, iv);
+    decipher.setAuthTag(authTag);
+    let decrypted = decipher.update(encrypted, "hex", "utf8");
+    decrypted += decipher.final("utf8");
+    return decrypted;
+  } catch (err) {
+    console.error("Decryption error:", err);
+    return "";
+  }
+}
+
+/**
+ * Encrypt/hash password for DB storage
+ */
+export async function hashPassword(password: string): Promise<string> {
+  if (!password) return "";
+  return encryptPassword(password);
+}
+
+/**
+ * Verify password against encrypted string, bcrypt hash, or plain text
+ */
+export async function verifyPassword(password: string, hashOrEncrypted: string): Promise<boolean> {
+  if (!hashOrEncrypted) return false;
+
+  // 1. If stored as encrypted format `enc:...`, decrypt and compare
+  if (hashOrEncrypted.startsWith("enc:")) {
+    const decrypted = decryptPassword(hashOrEncrypted);
+    return password === decrypted;
+  }
+
+  // 2. If stored as bcrypt hash
+  if (hashOrEncrypted.startsWith("$2a$") || hashOrEncrypted.startsWith("$2b$") || hashOrEncrypted.startsWith("$2y$")) {
+    return await bcrypt.compare(password, hashOrEncrypted);
+  }
+
+  // 3. Fallback plain text comparison
+  return password === hashOrEncrypted;
 }
 
 /**
@@ -97,16 +156,19 @@ export async function getAuthenticatedUserId(): Promise<string | null> {
   return null;
 }
 
+let passwordColumnInitialized = false;
+
 /**
  * Ensures the password column exists in the PostgreSQL employees table
  */
 export async function ensurePasswordColumnExists() {
-  if (!db) return;
+  if (!db || passwordColumnInitialized) return;
   try {
     await db.query(`
       ALTER TABLE employees 
       ADD COLUMN IF NOT EXISTS password VARCHAR(255);
     `);
+    passwordColumnInitialized = true;
   } catch (err) {
     console.warn("Could not alter table employees to add password column:", err);
   }
