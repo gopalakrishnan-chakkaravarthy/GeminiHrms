@@ -5,7 +5,14 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Dialog,
@@ -15,7 +22,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Leaf, Lock, Mail, Eye, EyeOff, LogIn, UserCheck, Shield, Sparkles, KeyRound, CheckCircle2, Loader2, Copy, Check } from "lucide-react";
+import {
+  Leaf,
+  Lock,
+  Mail,
+  Eye,
+  EyeOff,
+  LogIn,
+  UserCheck,
+  Shield,
+  Sparkles,
+  KeyRound,
+  CheckCircle2,
+  Loader2,
+  Copy,
+  Check,
+} from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -29,7 +51,11 @@ export default function LoginPage() {
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
   const [resetLoading, setResetLoading] = useState(false);
-  const [resetResult, setResetResult] = useState<{ success: boolean; message: string; tempPass?: string } | null>(null);
+  const [resetResult, setResetResult] = useState<{
+    success: boolean;
+    message: string;
+    tempPass?: string;
+  } | null>(null);
   const [copiedTempPass, setCopiedTempPass] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -47,7 +73,9 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        setError(data.message || "Failed to log in. Please check your credentials.");
+        setError(
+          data.message || "Failed to log in. Please check your credentials.",
+        );
         setLoading(false);
         return;
       }
@@ -56,7 +84,9 @@ export default function LoginPage() {
       router.push("/dashboard");
       router.refresh();
     } catch (err: any) {
-      setError(err?.message || "An unexpected error occurred. Please try again.");
+      setError(
+        err?.message || "An unexpected error occurred. Please try again.",
+      );
       setLoading(false);
     }
   };
@@ -186,12 +216,20 @@ export default function LoginPage() {
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 focus:outline-none"
                   >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
                   </button>
                 </div>
               </div>
 
-              <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold" disabled={loading}>
+              <Button
+                type="submit"
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                disabled={loading}
+              >
                 {loading ? (
                   <span className="flex items-center gap-2">
                     <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
@@ -205,7 +243,7 @@ export default function LoginPage() {
               </Button>
             </form>
 
-            <div className="pt-4 border-t border-slate-200 dark:border-slate-800 space-y-3">
+            {/* <div className="pt-4 border-t border-slate-200 dark:border-slate-800 space-y-3">
               <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                 <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                 Quick Login Options
@@ -236,7 +274,7 @@ export default function LoginPage() {
                   </div>
                 </Button>
               </div>
-            </div>
+            </div> */}
           </CardContent>
           <CardFooter className="text-xs text-center text-slate-500 dark:text-slate-400 justify-center border-t border-slate-100 dark:border-slate-800 pt-3">
             Protected by Custom JWT & Role-Based Access Control
@@ -249,10 +287,12 @@ export default function LoginPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <KeyRound className="h-5 w-5 text-emerald-600" /> Reset Your Password
+              <KeyRound className="h-5 w-5 text-emerald-600" /> Reset Your
+              Password
             </DialogTitle>
             <DialogDescription>
-              Enter your registered work email address. We will generate a temporary password and dispatch login instructions.
+              Enter your registered work email address. We will generate a
+              temporary password and dispatch login instructions.
             </DialogDescription>
           </DialogHeader>
 
@@ -275,30 +315,68 @@ export default function LoginPage() {
               </div>
 
               <DialogFooter className="pt-2">
-                <Button type="button" variant="ghost" onClick={() => setResetDialogOpen(false)}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setResetDialogOpen(false)}
+                >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={resetLoading} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-                  {resetLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <Button
+                  type="submit"
+                  disabled={resetLoading}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
+                  {resetLoading && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
                   Request Reset
                 </Button>
               </DialogFooter>
             </form>
           ) : (
             <div className="space-y-4 py-2">
-              <Alert className={resetResult.success ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-100" : "border-rose-500 bg-rose-50 dark:bg-rose-950/40"}>
-                {resetResult.success ? <CheckCircle2 className="h-5 w-5 text-emerald-600" /> : <Lock className="h-5 w-5 text-rose-600" />}
-                <AlertTitle className="font-bold">{resetResult.success ? "Request Sent" : "Reset Failed"}</AlertTitle>
-                <AlertDescription className="text-xs mt-1">{resetResult.message}</AlertDescription>
+              <Alert
+                className={
+                  resetResult.success
+                    ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-100"
+                    : "border-rose-500 bg-rose-50 dark:bg-rose-950/40"
+                }
+              >
+                {resetResult.success ? (
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                ) : (
+                  <Lock className="h-5 w-5 text-rose-600" />
+                )}
+                <AlertTitle className="font-bold">
+                  {resetResult.success ? "Request Sent" : "Reset Failed"}
+                </AlertTitle>
+                <AlertDescription className="text-xs mt-1">
+                  {resetResult.message}
+                </AlertDescription>
               </Alert>
 
               {resetResult.success && resetResult.tempPass && (
                 <div className="p-3 bg-slate-900 text-white rounded-lg space-y-1.5">
-                  <div className="text-xs text-slate-400">Temporary Password Generated:</div>
+                  <div className="text-xs text-slate-400">
+                    Temporary Password Generated:
+                  </div>
                   <div className="flex items-center justify-between">
-                    <span className="font-mono text-base font-bold text-emerald-400">{resetResult.tempPass}</span>
-                    <Button type="button" size="sm" variant="secondary" onClick={copyTempPass} className="h-7 text-xs">
-                      {copiedTempPass ? <Check className="h-3 w-3 text-emerald-600 mr-1" /> : <Copy className="h-3 w-3 mr-1" />}
+                    <span className="font-mono text-base font-bold text-emerald-400">
+                      {resetResult.tempPass}
+                    </span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={copyTempPass}
+                      className="h-7 text-xs"
+                    >
+                      {copiedTempPass ? (
+                        <Check className="h-3 w-3 text-emerald-600 mr-1" />
+                      ) : (
+                        <Copy className="h-3 w-3 mr-1" />
+                      )}
                       {copiedTempPass ? "Copied" : "Copy"}
                     </Button>
                   </div>
@@ -316,7 +394,9 @@ export default function LoginPage() {
                   }}
                   className="w-full bg-slate-900 text-white hover:bg-slate-800"
                 >
-                  {resetResult.success ? "Use Temp Password to Sign In" : "Close"}
+                  {resetResult.success
+                    ? "Use Temp Password to Sign In"
+                    : "Close"}
                 </Button>
               </DialogFooter>
             </div>
