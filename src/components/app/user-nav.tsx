@@ -50,42 +50,44 @@ export function UserNav({ user }: UserNavProps) {
   };
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-          <Avatar className="h-9 w-9">
-            <AvatarImage src={user.avatarUrl} alt={user.name} data-ai-hint={user.dataAiHint} />
-            <AvatarFallback>{user.name ? user.name.charAt(0) : "U"}</AvatarFallback>
-          </Avatar>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56" align="end" forceMount>
-        <DropdownMenuLabel className="font-normal">
-          <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{user.name}</p>
-            <p className="text-xs leading-none text-muted-foreground">
-              {user.email}
-            </p>
-            {user.roleName && (
-              <span className="text-[10px] text-emerald-600 font-semibold uppercase tracking-wider">
-                {user.roleName}
-              </span>
-            )}
-          </div>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuGroup>
-          <DropdownMenuItem onClick={() => router.push("/dashboard")}>Dashboard</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setChangePasswordOpen(true)} className="cursor-pointer">
-            Change Password
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+            <Avatar className="h-9 w-9">
+              <AvatarImage src={user.avatarUrl} alt={user.name} data-ai-hint={user.dataAiHint} />
+              <AvatarFallback>{user.name ? user.name.charAt(0) : "U"}</AvatarFallback>
+            </Avatar>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="w-56" align="end" forceMount>
+          <DropdownMenuLabel className="font-normal">
+            <div className="flex flex-col space-y-1">
+              <p className="text-sm font-medium leading-none">{user.name}</p>
+              <p className="text-xs leading-none text-muted-foreground">
+                {user.email}
+              </p>
+              {user.roleName && (
+                <span className="text-[10px] text-emerald-600 font-semibold uppercase tracking-wider">
+                  {user.roleName}
+                </span>
+              )}
+            </div>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuGroup>
+            <DropdownMenuItem onClick={() => router.push("/dashboard")}>Dashboard</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setChangePasswordOpen(true)} className="cursor-pointer">
+              Change Password
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={handleSignOut} className="text-red-600 cursor-pointer">
+            Log out
           </DropdownMenuItem>
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleSignOut} className="text-red-600 cursor-pointer">
-          Log out
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-    <ChangePasswordDialog open={changePasswordOpen} onOpenChange={setChangePasswordOpen} />
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <ChangePasswordDialog open={changePasswordOpen} onOpenChange={setChangePasswordOpen} />
+    </>
   );
 }

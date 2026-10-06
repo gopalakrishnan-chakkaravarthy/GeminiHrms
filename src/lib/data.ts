@@ -262,12 +262,12 @@ export async function getAppUser(userId: string): Promise<User | null> {
   try {
     const data = await db.query(
       `
-      SELECT 
-        e.id, 
-        e.name, 
-        e.email, 
-        e.avatar_url AS "avatarUrl", 
-        e.data_ai_hint AS "dataAiHint", 
+      SELECT
+        e.id,
+        e.name,
+        e.email,
+        e.avatar_url AS "avatarUrl",
+        e.data_ai_hint AS "dataAiHint",
         r.id as "roleId",
         r.name as "roleName",
         d.id as "departmentId",
@@ -1434,7 +1434,7 @@ export async function getYearlyLeaveBalances(options?: {
       LEFT JOIN roles r ON e.role_id = r.id
       LEFT JOIN departments d ON e.department_id = d.id
       LEFT JOIN leave_policies lp ON lp.role_id = e.role_id AND lp.leave_type_id = lt.id
-      LEFT JOIN leave_balances lb ON lb.employee_id = e.id AND lb.leave_type_id = lt.id AND (lb.year = $1 OR lb.year IS NULL)
+      LEFT JOIN leave_balances lb ON lb.employee_id = e.id AND lb.leave_type_id = lt.id
       ${whereClause}
       ORDER BY e.name, lt.name
     `;

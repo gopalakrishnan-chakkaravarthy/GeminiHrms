@@ -80,9 +80,9 @@ export default function LoginPage() {
         return;
       }
 
-      // Successful login - redirect to dashboard
-      router.push("/dashboard");
-      router.refresh();
+      // Hard redirect so the browser sends the new auth cookie on the next request.
+      // Soft navigation (router.push) can race with cookie propagation in production.
+      window.location.href = "/dashboard";
     } catch (err: any) {
       setError(
         err?.message || "An unexpected error occurred. Please try again.",
@@ -186,7 +186,7 @@ export default function LoginPage() {
               </div>
 
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
+                {/* <div className="flex items-center justify-between">
                   <Label htmlFor="password">Password</Label>
                   <button
                     type="button"
@@ -199,7 +199,7 @@ export default function LoginPage() {
                   >
                     Forgot Password?
                   </button>
-                </div>
+                </div> */}
                 <div className="relative">
                   <Lock className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
                   <Input

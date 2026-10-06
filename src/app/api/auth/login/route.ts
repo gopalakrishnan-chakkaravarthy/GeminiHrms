@@ -127,9 +127,12 @@ export async function POST(req: NextRequest) {
     });
 
     // Set auth cookie
+    // COOKIE_SECURE=true should only be set when the app is served over HTTPS.
+    // Using NODE_ENV=production alone is not sufficient — HTTP deployments must keep secure=false.
+    const secureCookie = process.env.COOKIE_SECURE === "true";
     response.cookies.set("auth_token", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: secureCookie,
       sameSite: "lax",
       path: "/",
       maxAge: 60 * 60 * 24 * 7, // 7 days

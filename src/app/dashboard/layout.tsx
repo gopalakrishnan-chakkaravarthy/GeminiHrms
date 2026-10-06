@@ -1,12 +1,24 @@
-import type React from 'react';
-import { redirect } from 'next/navigation';
-import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarFooter, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
-import { MainNav } from '@/components/app/main-nav';
-import { UserNav } from '@/components/app/user-nav';
-import { NotificationBell } from '@/components/app/notification-bell';
-import { Leaf } from 'lucide-react';
-import { getAllowedRoutesForUser, getAppUser, getAllLeaveRequests } from '@/lib/data';
-import { getAuthenticatedUserId } from '@/lib/auth';
+import type React from "react";
+import { redirect } from "next/navigation";
+import {
+  SidebarProvider,
+  Sidebar,
+  SidebarHeader,
+  SidebarContent,
+  SidebarFooter,
+  SidebarTrigger,
+  SidebarInset,
+} from "@/components/ui/sidebar";
+import { MainNav } from "@/components/app/main-nav";
+import { UserNav } from "@/components/app/user-nav";
+import { NotificationBell } from "@/components/app/notification-bell";
+import { Leaf } from "lucide-react";
+import {
+  getAllowedRoutesForUser,
+  getAppUser,
+  getAllLeaveRequests,
+} from "@/lib/data";
+import { getAuthenticatedUserId } from "@/lib/auth";
 
 export default async function DashboardLayout({
   children,
@@ -21,7 +33,7 @@ export default async function DashboardLayout({
   }
 
   if (!userId) {
-    redirect('/login');
+    redirect("/login");
   }
 
   const [allowedRoutes, user, allRequests] = await Promise.all([
@@ -32,11 +44,23 @@ export default async function DashboardLayout({
 
   const pendingRequests = allRequests.filter((r) => r.status === "Pending");
 
+  const role = user?.roleName?.toLowerCase() ?? "";
+  const isAdmin = role === "administrator" || role === "admin";
+  const isManager = role === "manager";
+  const visiblePendingRequests = isAdmin
+    ? pendingRequests
+    : isManager
+      ? pendingRequests.filter((r) => r.managerId === userId)
+      : [];
+
   if (!user) {
     return (
-        <div className="flex items-center justify-center h-screen">
-          <p>Error: Your application profile could not be loaded. Please contact support.</p>
-        </div>
+      <div className="flex items-center justify-center h-screen">
+        <p>
+          Error: Your application profile could not be loaded. Please contact
+          support.
+        </p>
+      </div>
     );
   }
 
@@ -44,33 +68,31 @@ export default async function DashboardLayout({
     <SidebarProvider>
       <Sidebar>
         <SidebarHeader>
-            <div className="flex items-center gap-2 p-2">
-                <div className="bg-primary p-2 rounded-lg">
-                    <Leaf className="text-primary-foreground" />
-                </div>
-                <h1 className="text-xl font-bold font-headline text-primary">AbsenceAce</h1>
+          <div className="flex items-center gap-2 p-2">
+            <div className="bg-primary p-2 rounded-lg">
+              <Leaf className="text-primary-foreground" />
             </div>
+            <h1 className="text-xl font-bold font-headline text-primary">
+              AbsenceAce
+            </h1>
+          </div>
         </SidebarHeader>
         <SidebarContent>
-            <MainNav allowedRoutes={allowedRoutes} />
+          <MainNav allowedRoutes={allowedRoutes} />
         </SidebarContent>
-        <SidebarFooter>
-            {/* Can add footer items here */}
-        </SidebarFooter>
+        <SidebarFooter>{/* Can add footer items here */}</SidebarFooter>
       </Sidebar>
       <SidebarInset>
         <header className="flex h-14 items-center gap-4 border-b bg-background/95 backdrop-blur-sm px-4 lg:h-[60px] lg:px-6 sticky top-0 z-10">
-            <div className="flex-1 flex items-center gap-2">
-                <SidebarTrigger className="md:hidden" />
-            </div>
-            <div className="flex items-center gap-3">
-                <NotificationBell user={user} pendingRequests={pendingRequests} />
-                <UserNav user={user} />
-            </div>
+          <div className="flex-1 flex items-center gap-2">
+            <SidebarTrigger className="md:hidden" />
+          </div>
+          <div className="flex items-center gap-3">
+            {/* <NotificationBell user={user} pendingRequests={visiblePendingRequests} /> */}
+            <UserNav user={user} />
+          </div>
         </header>
-        <main className="flex-1 p-4 md:p-6">
-            {children}
-        </main>
+        <main className="flex-1 p-4 md:p-6">{children}</main>
       </SidebarInset>
     </SidebarProvider>
   );
