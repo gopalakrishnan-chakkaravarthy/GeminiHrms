@@ -16,7 +16,6 @@ import {
   getLeaveTypes,
   getLeaveBalances,
   getYearlyLeaveBalances,
-  getFallbackUserId,
   getTodayAttendanceLog,
   getDepartments,
 } from "@/lib/data";
@@ -38,7 +37,7 @@ export default async function DashboardPage() {
   }
 
   if (!userId) {
-    userId = await getFallbackUserId();
+    redirect('/login');
   }
 
   const defaultScreen = await getDefaultScreenForUser(userId);

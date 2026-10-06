@@ -1,10 +1,11 @@
 import type React from 'react';
+import { redirect } from 'next/navigation';
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarFooter, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
 import { MainNav } from '@/components/app/main-nav';
 import { UserNav } from '@/components/app/user-nav';
 import { NotificationBell } from '@/components/app/notification-bell';
 import { Leaf } from 'lucide-react';
-import { getAllowedRoutesForUser, getAppUser, getFallbackUserId, getAllLeaveRequests } from '@/lib/data';
+import { getAllowedRoutesForUser, getAppUser, getAllLeaveRequests } from '@/lib/data';
 import { getAuthenticatedUserId } from '@/lib/auth';
 
 export default async function DashboardLayout({
@@ -20,7 +21,7 @@ export default async function DashboardLayout({
   }
 
   if (!userId) {
-    userId = await getFallbackUserId();
+    redirect('/login');
   }
 
   const [allowedRoutes, user, allRequests] = await Promise.all([

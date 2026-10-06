@@ -6,7 +6,7 @@ import {
   type LeaveInsightsOutput,
 } from "@/ai/flows/leave-insights";
 import { generateLeaveStatusEmail } from "@/lib/email";
-import { db, getAppUser, getHolidays, getLeaveBalances, getFallbackUserId } from "@/lib/data";
+import { db, getAppUser, getHolidays, getLeaveBalances } from "@/lib/data";
 import { parseLocalDate } from "@/lib/utils";
 import { getAuthenticatedUserId } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
@@ -122,7 +122,7 @@ export async function createLeaveRequestAction(
     // ignore
   }
   if (!userId) {
-    userId = await getFallbackUserId();
+    return { success: false, message: "Authentication Error: Please log in again." };
   }
 
   const user = await getAppUser(userId);
@@ -265,7 +265,7 @@ export async function withdrawLeaveRequestAction(
     // ignore
   }
   if (!userId) {
-    userId = await getFallbackUserId();
+    return { success: false, message: "Authentication Error: Please log in again." };
   }
 
   try {
@@ -445,10 +445,7 @@ export async function recordPunchInAction(input: {
   distanceMeters: number;
 }): Promise<{ success: boolean; message: string }> {
   try {
-    let userId = await getAuthenticatedUserId();
-    if (!userId) {
-      userId = await getFallbackUserId();
-    }
+    const userId = await getAuthenticatedUserId();
     if (!userId) {
       return { success: false, message: "User is not authenticated." };
     }
@@ -476,10 +473,7 @@ export async function recordPunchInAction(input: {
 
 export async function recordPunchOutAction(): Promise<{ success: boolean; message: string }> {
   try {
-    let userId = await getAuthenticatedUserId();
-    if (!userId) {
-      userId = await getFallbackUserId();
-    }
+    const userId = await getAuthenticatedUserId();
     if (!userId) {
       return { success: false, message: "User is not authenticated." };
     }

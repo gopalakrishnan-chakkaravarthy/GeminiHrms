@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getLeaveBalances, getFallbackUserId } from "@/lib/data";
+import { getLeaveBalances } from "@/lib/data";
 import { Plane, HeartPulse, User } from "lucide-react";
 import { getAuthenticatedUserId } from "@/lib/auth";
 
@@ -24,7 +24,7 @@ export async function LeaveBalanceCards() {
   }
 
   if (!userId) {
-    userId = await getFallbackUserId();
+    return null;
   }
 
   const balances = await getLeaveBalances(userId);

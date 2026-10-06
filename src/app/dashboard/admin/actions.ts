@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { generateLeaveStatusEmail, sendEmployeeOnboardingEmail, sendPasswordResetEmail } from "@/lib/email";
-import { runPayrollForEmployees, updateStatutorySettings, db, getAppUser, getFallbackUserId } from "@/lib/data";
+import { runPayrollForEmployees, updateStatutorySettings, db, getAppUser } from "@/lib/data";
+import { getAuthenticatedUserId } from "@/lib/auth";
 import { formatLocalDate, parseLocalDate } from "@/lib/utils";
 import { format, parseISO, differenceInDays } from "date-fns";
 import { z } from "zod";
@@ -81,15 +82,9 @@ export async function reviewLeaveRequestAction(
   prevState: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  let managerId: string | null = null;
-  try {
-    const authObj = await auth();
-    managerId = authObj?.userId || null;
-  } catch {
-    // ignore
-  }
+  const managerId = await getAuthenticatedUserId();
   if (!managerId) {
-    managerId = await getFallbackUserId();
+    return { success: false, message: "Authentication Error: Please log in again." };
   }
 
   const action = formData.get("action");
@@ -234,15 +229,9 @@ export async function batchReviewLeaveRequestsAction(
     return { success: false, message: "No leave requests selected." };
   }
 
-  let managerId: string | null = null;
-  try {
-    const authObj = await auth();
-    managerId = authObj?.userId || null;
-  } catch {
-    // ignore
-  }
+  const managerId = await getAuthenticatedUserId();
   if (!managerId) {
-    managerId = await getFallbackUserId();
+    return { success: false, message: "Authentication Error: Please log in again." };
   }
 
   const newStatus = action === "approve" ? "Approved" : "Rejected";
@@ -336,15 +325,9 @@ export async function createLeaveOnBehalfAction(
   prevState: FormState,
   formData: FormData
 ): Promise<FormState> {
-  let adminId: string | null = null;
-  try {
-    const authObj = await auth();
-    adminId = authObj?.userId || null;
-  } catch {
-    // ignore
-  }
+  const adminId = await getAuthenticatedUserId();
   if (!adminId) {
-    adminId = await getFallbackUserId();
+    return { success: false, message: "Authentication Error: Please log in again." };
   }
 
   const employeeId = formData.get("employeeId") as string;
@@ -434,15 +417,9 @@ export async function createLeaveOnBehalfAction(
 export async function deleteLeaveRequestByManagerAction(
   requestId: string,
 ): Promise<DeleteResult> {
-  let managerId: string | null = null;
-  try {
-    const authObj = await auth();
-    managerId = authObj?.userId || null;
-  } catch {
-    // ignore
-  }
+  const managerId = await getAuthenticatedUserId();
   if (!managerId) {
-    managerId = await getFallbackUserId();
+    return { success: false, message: "Authentication Error: Please log in again." };
   }
 
   try {

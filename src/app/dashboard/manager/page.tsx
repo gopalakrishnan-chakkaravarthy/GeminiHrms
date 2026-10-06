@@ -1,4 +1,4 @@
-import { getLeaveRequestsForManager, getAppUser, getFallbackUserId, getEmployees, getLeaveTypes, getYearlyLeaveBalances } from '@/lib/data';
+import { getLeaveRequestsForManager, getEmployees, getLeaveTypes, getYearlyLeaveBalances } from '@/lib/data';
 import { getAuthenticatedUserId } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -17,7 +17,7 @@ export default async function ManagerPage() {
     }
 
     if (!userId) {
-      userId = await getFallbackUserId();
+      redirect('/login');
     }
 
     const currentYear = new Date().getFullYear();

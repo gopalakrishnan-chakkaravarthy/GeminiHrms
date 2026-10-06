@@ -8,8 +8,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { getAllLeaveRequests, getHolidays, getAppUser, getFallbackUserId } from "@/lib/data";
+import { getAllLeaveRequests, getHolidays, getAppUser } from "@/lib/data";
 import { getAuthenticatedUserId } from "@/lib/auth";
+import { redirect } from "next/navigation";
 
 export default async function CalendarPage() {
   const currentYear = new Date().getFullYear();
@@ -21,7 +22,7 @@ export default async function CalendarPage() {
   }
 
   if (!userId) {
-    userId = await getFallbackUserId();
+    redirect('/login');
   }
 
   const [approvedLeaves, holidays, user] = await Promise.all([
