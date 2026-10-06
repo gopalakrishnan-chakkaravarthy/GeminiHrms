@@ -36,11 +36,13 @@ export async function middleware(req: NextRequest) {
   // 2. Custom Authentication Middleware
   const authToken = req.cookies.get("auth_token")?.value;
   let isValidToken = false;
+  let roleName = "";
 
   if (authToken) {
     try {
-      await jwtVerify(authToken, JWT_SECRET);
+      const { payload } = await jwtVerify(authToken, JWT_SECRET);
       isValidToken = true;
+      roleName = ((payload.roleName as string) || "").toLowerCase();
     } catch {
       isValidToken = false;
     }
@@ -59,6 +61,23 @@ export async function middleware(req: NextRequest) {
   // Redirect authenticated user away from login/sign-in pages
   if (isAuthPath && isValidToken) {
     return NextResponse.redirect(new URL("/dashboard", req.url));
+  }
+
+  // Role-based route protection for authenticated users
+  if (isProtectedPath && isValidToken) {
+    const isPrivileged =
+      roleName === "administrator" ||
+      roleName === "admin" ||
+      roleName === "manager";
+
+    // Admin/Manager-only routes — employees are redirected to /dashboard
+    if (
+      (pathname.startsWith("/dashboard/admin") ||
+        pathname.startsWith("/dashboard/manager")) &&
+      !isPrivileged
+    ) {
+      return NextResponse.redirect(new URL("/dashboard", req.url));
+    }
   }
 
   return NextResponse.next();
